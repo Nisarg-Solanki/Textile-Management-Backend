@@ -28,6 +28,7 @@ This must be enforced at the middleware level on every route — not just in the
 | Database    | PostgreSQL 17 — local during development, Neon in production |
 | Dev server  | ts-node-dev                                                  |
 | Environment | dotenv                                                       |
+| Linting     | ESLint v9 + typescript-eslint v8 (flat config)               |
 
 **Do NOT suggest switching frameworks, ORMs, or validation libraries mid-task.**
 **Do NOT use `any` type in TypeScript. Always type everything explicitly.**
@@ -78,6 +79,8 @@ backend/
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
+├── prisma.config.ts           # Prisma v7 datasource config — DATABASE_URL lives here
+├── eslint.config.mjs          # ESLint flat config — TypeScript rules
 ├── .env
 ├── .env.example
 ├── tsconfig.json
@@ -123,7 +126,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // No url field — Prisma v7 reads the connection from prisma.config.ts
 }
 
 model Firm {
@@ -143,6 +146,7 @@ model Firm {
   machines        Machine[]
   beams           Beam[]
   productionInfos ProductionInfo[]
+  takas           Taka[]
   millOutverts    MillOutvert[]
   millInverts     MillInvert[]
   users           User[]
@@ -736,8 +740,9 @@ All successful responses follow this structure:
 {
   "dependencies": {
     "express": "^5.1.x", // Latest stable — Express 5 is now the default
-    "prisma": "^7.7.x", // Latest — was ^5.x in old file, now on v7
     "@prisma/client": "^7.7.x", // Must match prisma version exactly
+    "@prisma/adapter-pg": "^7.7.x", // Prisma v7 requires driver adapter — no url in schema
+    "pg": "^8.x", // PostgreSQL driver used by @prisma/adapter-pg
     "zod": "^3.25.x", // Latest v3 stable
     "jsonwebtoken": "^9.0.x", // Latest stable, unchanged
     "bcryptjs": "^3.0.x", // v3 released 2025 — was ^2.x in old file
@@ -745,20 +750,25 @@ All successful responses follow this structure:
     "helmet": "^8.0.x", // v8 released 2024 — was ^7.x in old file
     "cors": "^2.8.x", // Latest stable, unchanged
     "express-rate-limit": "^7.5.x", // Latest stable
-    "swagger-jsdoc": "^6.2.x", // NEW — generates OpenAPI spec from JSDoc comments
-    "swagger-ui-express": "^5.0.x", // NEW — serves the Swagger UI and spec JSON endpoint
-    "cookie-parser": "^1.4.x" // NEW — needed to read httpOnly refresh token cookie
+    "swagger-jsdoc": "^6.2.x", // generates OpenAPI spec from JSDoc comments
+    "swagger-ui-express": "^5.0.x", // serves the Swagger UI and spec JSON endpoint
+    "cookie-parser": "^1.4.x" // needed to read httpOnly refresh token cookie
   },
   "devDependencies": {
+    "prisma": "^7.7.x", // CLI only — must match @prisma/client version
     "typescript": "^5.8.x", // Latest stable
     "ts-node-dev": "^2.0.x", // Latest stable, unchanged
+    "eslint": "^9.x", // Linter
+    "typescript-eslint": "^8.x", // TypeScript rules for ESLint
+    "@eslint/js": "^9.x", // ESLint recommended ruleset
     "@types/express": "^5.0.x", // Match Express 5
     "@types/jsonwebtoken": "^9.0.x",
     "@types/bcryptjs": "^2.4.x",
     "@types/cors": "^2.8.x",
-    "@types/cookie-parser": "^1.4.x", // NEW — types for cookie-parser
-    "@types/swagger-jsdoc": "^6.0.x", // NEW — types for swagger-jsdoc
-    "@types/swagger-ui-express": "^4.1.x", // NEW — types for swagger-ui-express
+    "@types/cookie-parser": "^1.4.x",
+    "@types/pg": "^8.x",
+    "@types/swagger-jsdoc": "^6.0.x",
+    "@types/swagger-ui-express": "^4.1.x",
     "@types/node": "^22.x"
   }
 }
@@ -849,6 +859,88 @@ Add this as a script in the frontend package.json:
 ```
 
 Run: `npm run generate:types` — done. All route types are available in the frontend.
+
+---
+
+## 17. Prisma v7 — Connection Configuration
+
+Prisma v7 removed `url = env("DATABASE_URL")` from the `datasource` block.
+Connection config now lives in **two places**:
+
+| Where | Purpose |
+|-------|---------|
+| `prisma.config.ts` (root) | Prisma CLI — used by `prisma migrate`, `prisma generate`, `prisma studio` |
+| `PrismaClient({ adapter })` in `src/lib/prisma.ts` | Runtime queries |
+
+```typescript
+// prisma.config.ts — CLI reads this for migrations
+import 'dotenv/config'
+import { defineConfig, env } from 'prisma/config'
+
+export default defineConfig({
+  datasource: {
+    url: env('DATABASE_URL'),   // use env() helper, not process.env — file is outside tsconfig rootDir
+  },
+})
+```
+
+```typescript
+// src/lib/prisma.ts — runtime client
+import { PrismaPg } from '@prisma/adapter-pg'
+import { PrismaClient } from '@prisma/client'
+
+function createPrismaClient(): PrismaClient {
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
+  return new PrismaClient({ adapter, log: ['error'] })
+}
+```
+
+`DATABASE_URL` is still loaded from `.env` via dotenv — nothing changes for the env var itself.
+
+---
+
+## 18. ESLint Setup
+
+Config file: `eslint.config.mjs` (flat config, always ESM via `.mjs` extension).
+
+```javascript
+// eslint.config.mjs
+import eslint from '@eslint/js'
+import tseslint from 'typescript-eslint'
+
+export default tseslint.config(
+  eslint.configs.recommended,
+  tseslint.configs.recommended,
+  {
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',       // enforces Section 15 rule
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      'no-console': ['error', { allow: ['error'] }],        // only console.error allowed
+    },
+  },
+  {
+    ignores: ['dist/**', 'node_modules/**'],
+  },
+)
+```
+
+**Scripts:**
+
+```bash
+npm run lint        # check for errors
+npm run lint:fix    # auto-fix where possible
+```
+
+**Rule rationale:**
+
+| Rule | Why |
+|------|-----|
+| `@typescript-eslint/no-explicit-any: error` | Enforces the "no `any`" requirement from Section 15 |
+| `@typescript-eslint/no-unused-vars: error` | Catches dead variables; prefix with `_` to intentionally ignore |
+| `no-console` (allow `error`) | Section 15 — `console.log` forbidden, `console.error` allowed in dev |
 
 ---
 
