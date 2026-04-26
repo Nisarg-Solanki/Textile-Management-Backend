@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { errorHandler } from "./lib/errors";
+import authRouter from "./routes/auth";
 
 const app = express();
 
@@ -50,6 +51,9 @@ const swaggerSpec = swaggerJsdoc({
 
 app.use("/api/v1/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get("/api/v1/api-docs.json", (_req, res) => res.json(swaggerSpec));
+
+// Routes
+app.use("/api/v1/auth", authRouter);
 
 // Health check
 app.get("/api/v1/health", (_req, res) => {
