@@ -3,7 +3,6 @@ import { AppError } from './errors';
 
 export interface AccessTokenPayload {
   userId: string;
-  firmId: string | null;
   role: string;
   email: string;
 }

@@ -28,7 +28,6 @@ model Firm {
   takas           Taka[]
   millOutverts    MillOutvert[]
   millInverts     MillInvert[]
-  users           User[]
 
   @@index([status])                      // filter active/inactive firms
   @@index([deletedAt])                   // soft-delete filter
@@ -250,21 +249,51 @@ model MillInvertTaka {
 
 model User {
   id           String    @id @default(uuid())
-  firmId       String?                              // null = admin (access to all firms)
   name         String
   email        String    @unique
   passwordHash String
-  role         String    @default("operator")       // "admin" | "firm_manager" | "operator"
-  status       String    @default("active")         // "active" | "inactive"
+  role         String    @default("admin")          // "super_admin" | "admin"
+  status       String    @default("pending")         // "active" | "inactive" | "pending"
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  firm Firm? @relation(fields: [firmId], references: [id])
+  passwordResetTokens PasswordResetToken[]
+  permissions         AdminPermission[]
 
-  @@index([firmId])                      // list users by firm
-  @@index([status])                      // filter active/inactive users
+  @@index([status])
   @@index([deletedAt])
   @@map("users")
+}
+
+model AdminPermission {
+  id        String  @id @default(uuid())
+  userId    String
+  module    String  // "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
+  canView   Boolean @default(false)
+  canCreate Boolean @default(false)
+  canEdit   Boolean @default(false)
+  canDelete Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, module])
+  @@index([userId])
+  @@map("admin_permissions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
 }

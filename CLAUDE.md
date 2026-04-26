@@ -7,11 +7,14 @@
 
 ## 1. Project Overview
 
-A multi-firm textile production management system. Firms manage beams, production records,
+A textile production management system. Firms manage beams, production records,
 taka (fabric rolls), mill dispatch/receipt operations, and machine status tracking.
 
-**Key rule:** Every piece of data belongs to a firm. Users can never access another firm's data.
-This must be enforced at the middleware level on every route — not just in the query.
+**Roles:** Two roles only — `super_admin` and `admin`.
+- `super_admin` — identified by `SUPER_ADMIN_EMAILS` env var; approves/rejects new admin registrations; assigns module-level permissions to each admin; has full access to everything.
+- `admin` — registered and approved by super_admin; access is limited to the modules and actions (view/create/edit/delete) that super_admin has explicitly granted.
+
+Data records (machines, beams, production, etc.) still carry a `firmId` as a data attribute for grouping/filtering, but user access is NOT locked to a firm — both roles can view data across all firms.
 
 ---
 
@@ -46,22 +49,23 @@ backend/
 │   │   └── schema.prisma      # Prisma schema — single source of DB truth
 │   ├── middleware/
 │   │   ├── auth.ts            # JWT verification — attaches req.user to every protected request
-│   │   └── firmScope.ts       # Validates req.user.firmId matches the :firmId route param
+│   │   └── permission.ts      # requirePermission(module, action) — super_admin bypasses; admin checks AdminPermission
 │   ├── routes/
 │   │   ├── auth.ts            # POST /api/v1/auth/login, /refresh, /logout, /register,
-│   │   │                      # /forgot-password, /reset-password, /users (admin),
-│   │   │                      # GET /pending-users (admin),
-│   │   │                      # POST /approve-user/:id, /reject-user/:id (admin)
-│   │   ├── firms.ts           # CRUD for firms (admin only)
-│   │   ├── mills.ts           # CRUD for mills (admin only)
-│   │   ├── machines.ts        # CRUD for machines — nested under /firms/:firmId
-│   │   ├── beams.ts           # CRUD for beams — nested under /firms/:firmId
-│   │   ├── production.ts      # CRUD for production_info — nested under /firms/:firmId
-│   │   ├── takas.ts           # GET only (view) — nested under /firms/:firmId
-│   │   ├── millOutverts.ts    # CRUD for mill_outverts — nested under /firms/:firmId
-│   │   ├── millInverts.ts     # CRUD for mill_inverts — nested under /firms/:firmId
-│   │   ├── machineInfo.ts     # GET only (view) — nested under /firms/:firmId
-│   │   └── millSummary.ts     # GET only (view) — nested under /firms/:firmId
+│   │   │                      # /forgot-password, /reset-password, /users (super_admin),
+│   │   │                      # GET /pending-users (super_admin),
+│   │   │                      # POST /approve-user/:id, /reject-user/:id (super_admin)
+│   │   ├── firms.ts           # CRUD for firms (super_admin only)
+│   │   ├── mills.ts           # CRUD for mills (super_admin only)
+│   │   ├── machines.ts        # CRUD for machines — /api/v1/machines
+│   │   ├── beams.ts           # CRUD for beams — /api/v1/beams
+│   │   ├── production.ts      # CRUD for production_info — /api/v1/production
+│   │   ├── takas.ts           # GET only (view) — /api/v1/takas
+│   │   ├── millOutverts.ts    # CRUD for mill_outverts — /api/v1/mill-outverts
+│   │   ├── millInverts.ts     # CRUD for mill_inverts — /api/v1/mill-inverts
+│   │   ├── machineInfo.ts     # GET only (view) — /api/v1/machine-info
+│   │   ├── millSummary.ts     # GET only (view) — /api/v1/mill-summary
+│   │   └── permissions.ts     # GET/PUT /api/v1/permissions/:adminId (super_admin only)
 │   ├── schemas/
 │   │   ├── auth.schema.ts
 │   │   ├── firm.schema.ts
@@ -70,7 +74,8 @@ backend/
 │   │   ├── beam.schema.ts
 │   │   ├── production.schema.ts
 │   │   ├── millOutvert.schema.ts
-│   │   └── millInvert.schema.ts
+│   │   ├── millInvert.schema.ts
+│   │   └── permission.schema.ts
 │   ├── services/
 │   │   ├── production.service.ts   # Business logic for production + taka atomic writes
 │   │   ├── millOutvert.service.ts  # Business logic for outvert + production sync
@@ -169,7 +174,6 @@ model Firm {
   takas           Taka[]
   millOutverts    MillOutvert[]
   millInverts     MillInvert[]
-  users           User[]
 
   @@index([status])                      // filter active/inactive firms
   @@index([deletedAt])                   // soft-delete filter
@@ -391,27 +395,40 @@ model MillInvertTaka {
 
 model User {
   id           String    @id @default(uuid())
-  firmId       String?                              // null = admin (access to all firms)
   name         String
   email        String    @unique
   passwordHash String
-  role         String    @default("operator")       // "admin" | "firm_manager" | "operator"
-  status       String    @default("pending")        // "active" | "inactive" | "pending"  ← changed from "active"; self-registered users wait for admin approval
+  role         String    @default("admin")          // "super_admin" | "admin"
+  status       String    @default("pending")         // "active" | "inactive" | "pending"
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  firm                Firm?                @relation(fields: [firmId], references: [id])
-  passwordResetTokens PasswordResetToken[]           // ← new relation
+  passwordResetTokens PasswordResetToken[]
+  permissions         AdminPermission[]
 
-  @@index([firmId])                      // list users by firm
   @@index([status])                      // filter active/inactive users
   @@index([deletedAt])
   @@map("users")
 }
 
-// New model — one-time tokens for password reset flow
+model AdminPermission {
+  id        String  @id @default(uuid())
+  userId    String
+  module    String  // "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
+  canView   Boolean @default(false)
+  canCreate Boolean @default(false)
+  canEdit   Boolean @default(false)
+  canDelete Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, module])
+  @@index([userId])
+  @@map("admin_permissions")
+}
+
 model PasswordResetToken {
   id        String    @id @default(uuid())
   userId    String
@@ -449,8 +466,8 @@ model PasswordResetToken {
 
 All routes are prefixed with `/api/v1`.
 Protected routes require `Authorization: Bearer <access_token>` header.
-Firm-scoped routes also run `firmScopeMiddleware` which verifies `req.user.firmId === req.params.firmId`
-(admin users bypass the firm scope check).
+Every protected route applies `authMiddleware` + `requirePermission(module, action)`.
+`super_admin` bypasses all permission checks. `admin` is checked against `AdminPermission`.
 
 ### Auth (public)
 
@@ -458,12 +475,12 @@ Firm-scoped routes also run `firmScopeMiddleware` which verifies `req.user.firmI
 POST   /api/v1/auth/login             # { email, password } → { accessToken, user }
 POST   /api/v1/auth/refresh           # Uses httpOnly refresh cookie → { accessToken }
 POST   /api/v1/auth/logout            # Clears refresh cookie
-POST   /api/v1/auth/register          # { name, email, password, firmId? } → status:"active" if super admin email or first-time setup, else status:"pending"
+POST   /api/v1/auth/register          # { name, email, password } → role:"super_admin" if super admin email or first-time setup, else role:"admin" status:"pending"
 POST   /api/v1/auth/forgot-password   # { email } → sends reset link (always returns 200 — never reveals if email exists)
 POST   /api/v1/auth/reset-password    # { token, password } → resets password via one-time token
 ```
 
-### Auth (admin only — requires Bearer token + role: "admin")
+### Auth (super_admin only — requires Bearer token + role: "super_admin")
 
 ```
 POST   /api/v1/auth/users             # Create user directly — always status:"active", skips pending flow
@@ -472,7 +489,15 @@ POST   /api/v1/auth/approve-user/:id  # Set user status → "active", send appro
 POST   /api/v1/auth/reject-user/:id   # Soft delete the pending user record
 ```
 
-### Firms (admin only)
+### Permissions (super_admin only)
+
+```
+GET    /api/v1/permissions/:adminId   # Get all module permissions for an admin
+PUT    /api/v1/permissions/:adminId   # Set/replace all module permissions for an admin
+                                      # Body: [{ module, canView, canCreate, canEdit, canDelete }, ...]
+```
+
+### Firms (super_admin only)
 
 ```
 GET    /api/v1/firms            # List all firms
@@ -482,7 +507,7 @@ PUT    /api/v1/firms/:id        # Update firm (including challanEnable toggle)
 DELETE /api/v1/firms/:id        # Soft delete (set deletedAt)
 ```
 
-### Mills (admin only)
+### Mills (super_admin only)
 
 ```
 GET    /api/v1/mills            # List all mills
@@ -492,68 +517,68 @@ PUT    /api/v1/mills/:id        # Update mill
 DELETE /api/v1/mills/:id        # Soft delete
 ```
 
-### Machines (firm-scoped)
+### Machines
 
 ```
-GET    /api/v1/firms/:firmId/machines        # List machines for firm. ?search= &status=
-POST   /api/v1/firms/:firmId/machines        # Create machine
-GET    /api/v1/firms/:firmId/machines/:id    # Get single machine
-PUT    /api/v1/firms/:firmId/machines/:id    # Update machine
-DELETE /api/v1/firms/:firmId/machines/:id    # Soft delete
+GET    /api/v1/machines          # ?search= &status= &firmId=
+POST   /api/v1/machines          # Create machine
+GET    /api/v1/machines/:id      # Get single machine
+PUT    /api/v1/machines/:id      # Update machine
+DELETE /api/v1/machines/:id      # Soft delete
 ```
 
-### Beams (firm-scoped)
+### Beams
 
 ```
-GET    /api/v1/firms/:firmId/beams           # ?search= &quality= &meter_min= &meter_max=
-POST   /api/v1/firms/:firmId/beams           # Create beam
-GET    /api/v1/firms/:firmId/beams/:id       # Get single beam
-PUT    /api/v1/firms/:firmId/beams/:id       # Update beam
-DELETE /api/v1/firms/:firmId/beams/:id       # Soft delete (blocked if production records exist)
+GET    /api/v1/beams             # ?search= &quality= &meter_min= &meter_max= &firmId=
+POST   /api/v1/beams             # Create beam
+GET    /api/v1/beams/:id         # Get single beam
+PUT    /api/v1/beams/:id         # Update beam
+DELETE /api/v1/beams/:id         # Soft delete (blocked if production records exist)
 ```
 
-### Production Info (firm-scoped)
+### Production Info
 
 ```
-GET    /api/v1/firms/:firmId/production      # ?search= &machine= &beam= &date_from= &date_to= &quality=
-POST   /api/v1/firms/:firmId/production      # Create + auto-create Taka (atomic transaction)
-GET    /api/v1/firms/:firmId/production/:id  # Get single entry with all linked data
-PUT    /api/v1/firms/:firmId/production/:id  # Update + sync Taka (atomic)
-DELETE /api/v1/firms/:firmId/production/:id  # Soft delete + soft delete linked Taka
+GET    /api/v1/production        # ?search= &machine= &beam= &date_from= &date_to= &quality= &firmId=
+POST   /api/v1/production        # Create + auto-create Taka (atomic transaction)
+GET    /api/v1/production/:id    # Get single entry with all linked data
+PUT    /api/v1/production/:id    # Update + sync Taka (atomic)
+DELETE /api/v1/production/:id    # Soft delete + soft delete linked Taka
 ```
 
-### Takas (firm-scoped, GET only)
+### Takas (GET only)
 
 ```
-GET    /api/v1/firms/:firmId/takas           # ?search= &beam_no= &meter_min= &meter_max=
-GET    /api/v1/firms/:firmId/takas/:id       # Get single Taka with linked ProductionInfo
+GET    /api/v1/takas             # ?search= &beam_no= &meter_min= &meter_max= &firmId=
+GET    /api/v1/takas/:id         # Get single Taka with linked ProductionInfo
 ```
 
-### Mill Outverts (firm-scoped)
+### Mill Outverts
 
 ```
-GET    /api/v1/firms/:firmId/mill-outverts           # ?search= &mill= &date_from= &date_to=
-POST   /api/v1/firms/:firmId/mill-outverts           # Create + sync ProductionInfo (atomic)
-GET    /api/v1/firms/:firmId/mill-outverts/:id       # Get single outvert with Taka list
-PUT    /api/v1/firms/:firmId/mill-outverts/:id       # Update + re-sync ProductionInfo
-DELETE /api/v1/firms/:firmId/mill-outverts/:id       # Soft delete + clear mill fields in ProductionInfo
+GET    /api/v1/mill-outverts           # ?search= &mill= &date_from= &date_to= &firmId=
+POST   /api/v1/mill-outverts           # Create + sync ProductionInfo (atomic)
+GET    /api/v1/mill-outverts/:id       # Get single outvert with Taka list
+PUT    /api/v1/mill-outverts/:id       # Update + re-sync ProductionInfo
+DELETE /api/v1/mill-outverts/:id       # Soft delete + clear mill fields in ProductionInfo
 ```
 
-### Mill Inverts (firm-scoped)
+### Mill Inverts
 
 ```
-GET    /api/v1/firms/:firmId/mill-inverts            # ?search= &mill= &date_from= &date_to=
-POST   /api/v1/firms/:firmId/mill-inverts            # Create + sync ProductionInfo (atomic)
-GET    /api/v1/firms/:firmId/mill-inverts/:id        # Get single invert with Taka list
-PUT    /api/v1/firms/:firmId/mill-inverts/:id        # Update + re-sync ProductionInfo
-DELETE /api/v1/firms/:firmId/mill-inverts/:id        # Soft delete + clear invert fields in ProductionInfo
+GET    /api/v1/mill-inverts            # ?search= &mill= &date_from= &date_to= &firmId=
+POST   /api/v1/mill-inverts            # Create + sync ProductionInfo (atomic)
+GET    /api/v1/mill-inverts/:id        # Get single invert with Taka list
+PUT    /api/v1/mill-inverts/:id        # Update + re-sync ProductionInfo
+DELETE /api/v1/mill-inverts/:id        # Soft delete + clear invert fields in ProductionInfo
 ```
 
-### Auto-generated Views (firm-scoped, GET only)
+### Auto-generated Views (GET only)
 
 ```
-GET    /api/v1/firms/:firmId/machine-info            # ?search= &machine_no=
-GET    /api/v1/firms/:firmId/mill-summary            # ?search= &mill= &status= &date_from= &date_to=
+GET    /api/v1/machine-info            # ?search= &machine_no= &firmId=
+GET    /api/v1/mill-summary            # ?search= &mill= &status= &date_from= &date_to= &firmId=
 ```
 
 ---
@@ -569,7 +594,7 @@ GET    /api/v1/firms/:firmId/mill-summary            # ?search= &mill= &status= 
 6. authMiddleware            — verifies JWT, attaches req.user — applied to all routes except:
                                /auth/login, /auth/refresh, /auth/logout,
                                /auth/register, /auth/forgot-password, /auth/reset-password
-7. firmScopeMiddleware       — applied only to firm-scoped routes — checks req.user.firmId === req.params.firmId (skipped for admin)
+7. requirePermission(module, action) — applied per route handler (not globally); super_admin always passes; admin checked against AdminPermission table
 8. route handlers
 9. errorHandler              — global error handler at the bottom of app.ts
 ```
@@ -641,34 +666,32 @@ await prisma.model.update({
 
 All GET queries must include `where: { deletedAt: null }`.
 
-### Rule 6 — Firm scoping on every DB query
+### Rule 6 — Permission check on every protected route
 
-Every query on a firm-scoped resource must include `firmId` in the where clause.
-The `firmId` always comes from `req.user.firmId` (not from req.params, not from req.body).
+Every route beyond the public auth endpoints must apply `requirePermission(module, action)` after `authMiddleware`.
+`super_admin` bypasses all checks automatically. `admin` is checked against the `AdminPermission` table.
 
 ```typescript
-// CORRECT
-const beams = await prisma.beam.findMany({
-  where: { firmId: req.user.firmId, deletedAt: null },
-});
-
-// WRONG — never trust firmId from params directly in the DB query
-const beams = await prisma.beam.findMany({
-  where: { firmId: req.params.firmId },
-});
+// Pattern — always pair authMiddleware + requirePermission on every protected route
+router.get('/',    authMiddleware, requirePermission('machines', 'view'),   async (req, res) => { ... });
+router.post('/',   authMiddleware, requirePermission('machines', 'create'), async (req, res) => { ... });
+router.put('/:id', authMiddleware, requirePermission('machines', 'edit'),   async (req, res) => { ... });
+router.delete('/:id', authMiddleware, requirePermission('machines', 'delete'), async (req, res) => { ... });
 ```
 
 ### Rule 7 — User registration flow
 
-New users who self-register via `POST /auth/register` are created with `status: "pending"` and
-cannot log in until an admin approves them. Two exceptions auto-approve immediately:
+New users who self-register via `POST /auth/register` are created with `role: "admin"`, `status: "pending"` and
+cannot log in until a super_admin approves them. Two exceptions auto-approve immediately:
 
 1. **First-time setup** — if no user with a `SUPER_ADMIN_EMAILS` email exists in the DB yet,
-   the first registrant is auto-approved regardless of their email.
+   the first registrant is auto-approved as `role: "super_admin"` regardless of their email.
 2. **Super admin email** — if the registrant's email is in `SUPER_ADMIN_EMAILS` env var,
-   they are auto-approved with `role: "admin"`.
+   they are auto-approved with `role: "super_admin"`.
 
-Admin-created users (`POST /auth/users`) are always `status: "active"` — they skip the pending flow entirely.
+Super-admin-created users (`POST /auth/users`) are always `status: "active"` — they skip the pending flow entirely.
+When a super_admin approves a pending user, that user gets `role: "admin"` with no permissions by default.
+Permissions must then be explicitly granted via `PUT /api/v1/permissions/:adminId`.
 
 ---
 
@@ -679,9 +702,10 @@ across all relevant text columns using Prisma's `OR` filter.
 
 ```typescript
 // Standard search pattern — adapt columns per module
+// firmId is an optional query param filter — NOT taken from req.user
 const where = {
-  firmId: req.user.firmId,
   deletedAt: null,
+  ...(firmId && { firmId }),             // optional: ?firmId= to filter by firm
   ...(search && {
     OR: [
       { beamNo: { contains: search, mode: "insensitive" as const } },
@@ -758,16 +782,15 @@ Standard HTTP codes to use:
 ## 12. Auth Implementation Notes
 
 **Access token:** JWT signed with `JWT_ACCESS_SECRET`, expires in `15m`.
-Payload: `{ userId, firmId, role, email }`.
+Payload: `{ userId, role, email }`.
 
 **Refresh token:** JWT signed with `JWT_REFRESH_SECRET`, expires in `7d`.
 Stored in httpOnly cookie: `{ httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 }`.
 
 **Roles:**
 
-- `admin` — no firmId in token, bypasses firmScope middleware, can access all firms
-- `firm_manager` — has firmId in token, full CRUD within their firm
-- `operator` — has firmId in token, can only create/read ProductionInfo
+- `super_admin` — full access to everything; bypasses all permission checks; identified by `SUPER_ADMIN_EMAILS` env var at registration
+- `admin` — access limited to modules/actions explicitly granted via `AdminPermission`; no permissions by default after approval
 
 **Password hashing:** Always use `bcryptjs.hash(password, 12)`.
 Never return `passwordHash` in any API response — always explicitly exclude it in Prisma selects.
@@ -894,16 +917,15 @@ app.get("/api/v1/api-docs.json", (req, res) => res.json(swaggerSpec));
 ```typescript
 /**
  * @openapi
- * /api/v1/firms/{firmId}/beams:
+ * /api/v1/beams:
  *   get:
- *     summary: List beams for a firm
+ *     summary: List beams
  *     tags: [Beams]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
+ *       - in: query
  *         name: firmId
- *         required: true
  *         schema:
  *           type: string
  *       - in: query
@@ -914,7 +936,7 @@ app.get("/api/v1/api-docs.json", (req, res) => res.json(swaggerSpec));
  *       200:
  *         description: List of beams with pagination
  */
-router.get("/", authMiddleware, firmScopeMiddleware, async (req, res) => {
+router.get("/", authMiddleware, requirePermission('beams', 'view'), async (req, res) => {
   // ... handler
 });
 ```
@@ -1024,7 +1046,7 @@ npm run lint:fix    # auto-fix where possible
 
 - Do NOT use `any` type anywhere in TypeScript
 - Do NOT use `prisma.model.delete()` — always soft delete
-- Do NOT trust `firmId` from `req.params` or `req.body` for DB queries — use `req.user.firmId`
+- Do NOT use `req.user.firmId` for DB query scoping — users have no firmId; `firmId` is only an optional query-param filter
 - Do NOT write mill sync logic inside route handlers — put it in service files
 - Do NOT create/update `ProductionInfo` and `Taka` in separate DB calls — always use `prisma.$transaction`
 - Do NOT return `passwordHash` in any response — exclude it explicitly
@@ -1033,3 +1055,5 @@ npm run lint:fix    # auto-fix where possible
 - Do NOT mutate `req.body` directly — destructure it first into typed variables
 - Do NOT hardcode super admin emails anywhere — always use `getSuperAdminEmails()` from `src/lib/superAdmin.ts`
 - Do NOT `await` email sends on the critical response path — fire-and-forget with `.catch((err) => console.error(...))`
+- Do NOT skip `requirePermission` on any protected route — every non-public route must declare its module and action
+- Do NOT perform permission checks inside route handlers — always use the `requirePermission` middleware
