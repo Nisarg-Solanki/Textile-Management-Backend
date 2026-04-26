@@ -125,7 +125,7 @@ SMTP_USER="your@gmail.com"
 SMTP_PASS="your-app-password"
 
 # Base URL of the frontend — used to build links inside emails
-CLIENT_URL="http://localhost:3000"
+FRONTEND_URL="http://localhost:3000"
 ```
 
 > **DB environment rule:**
