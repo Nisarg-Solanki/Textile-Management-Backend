@@ -48,7 +48,10 @@ backend/
 │   │   ├── auth.ts            # JWT verification — attaches req.user to every protected request
 │   │   └── firmScope.ts       # Validates req.user.firmId matches the :firmId route param
 │   ├── routes/
-│   │   ├── auth.ts            # POST /api/v1/auth/login, /refresh, /logout
+│   │   ├── auth.ts            # POST /api/v1/auth/login, /refresh, /logout, /register,
+│   │   │                      # /forgot-password, /reset-password, /users (admin),
+│   │   │                      # GET /pending-users (admin),
+│   │   │                      # POST /approve-user/:id, /reject-user/:id (admin)
 │   │   ├── firms.ts           # CRUD for firms (admin only)
 │   │   ├── mills.ts           # CRUD for mills (admin only)
 │   │   ├── machines.ts        # CRUD for machines — nested under /firms/:firmId
@@ -75,7 +78,9 @@ backend/
 │   └── lib/
 │       ├── prisma.ts          # Prisma client singleton — import this everywhere
 │       ├── jwt.ts             # signToken, verifyToken helpers
-│       └── errors.ts          # AppError class + error handler middleware
+│       ├── errors.ts          # AppError class + error handler middleware
+│       ├── mailer.ts          # nodemailer — sendApprovalRequestEmail, sendPasswordResetEmail, sendAccountApprovedEmail
+│       └── superAdmin.ts      # getSuperAdminEmails(), isSuperAdminEmail() — reads SUPER_ADMIN_EMAILS env var
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
@@ -106,6 +111,21 @@ JWT_REFRESH_EXPIRES_IN="7d"
 PORT=4000
 NODE_ENV="development"
 FRONTEND_URL="http://localhost:3000"
+
+# Super admin emails — comma-separated, max 2.
+# Registrants with these emails are auto-approved as role: "admin".
+# If NO user with these emails exists in the DB yet, the very first registrant
+# is auto-approved regardless of email (first-time setup).
+SUPER_ADMIN_EMAILS="admin1@example.com,admin2@example.com"
+
+# SMTP — used for approval request emails, password reset emails, and account approved emails
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="your@gmail.com"
+SMTP_PASS="your-app-password"
+
+# Base URL of the frontend — used to build links inside emails
+CLIENT_URL="http://localhost:3000"
 ```
 
 > **DB environment rule:**
@@ -376,18 +396,35 @@ model User {
   email        String    @unique
   passwordHash String
   role         String    @default("operator")       // "admin" | "firm_manager" | "operator"
-  status       String    @default("active")         // "active" | "inactive"
+  status       String    @default("pending")        // "active" | "inactive" | "pending"  ← changed from "active"; self-registered users wait for admin approval
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  firm Firm? @relation(fields: [firmId], references: [id])
+  firm                Firm?                @relation(fields: [firmId], references: [id])
+  passwordResetTokens PasswordResetToken[]           // ← new relation
 
   @@index([firmId])                      // list users by firm
   @@index([status])                      // filter active/inactive users
   @@index([deletedAt])
   @@map("users")
+}
+
+// New model — one-time tokens for password reset flow
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?                      // set when consumed — prevents reuse
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([token])
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 ```
 
@@ -418,9 +455,21 @@ Firm-scoped routes also run `firmScopeMiddleware` which verifies `req.user.firmI
 ### Auth (public)
 
 ```
-POST   /api/v1/auth/login       # { email, password } → { accessToken, user }
-POST   /api/v1/auth/refresh     # Uses httpOnly refresh cookie → { accessToken }
-POST   /api/v1/auth/logout      # Clears refresh cookie
+POST   /api/v1/auth/login             # { email, password } → { accessToken, user }
+POST   /api/v1/auth/refresh           # Uses httpOnly refresh cookie → { accessToken }
+POST   /api/v1/auth/logout            # Clears refresh cookie
+POST   /api/v1/auth/register          # { name, email, password, firmId? } → status:"active" if super admin email or first-time setup, else status:"pending"
+POST   /api/v1/auth/forgot-password   # { email } → sends reset link (always returns 200 — never reveals if email exists)
+POST   /api/v1/auth/reset-password    # { token, password } → resets password via one-time token
+```
+
+### Auth (admin only — requires Bearer token + role: "admin")
+
+```
+POST   /api/v1/auth/users             # Create user directly — always status:"active", skips pending flow
+GET    /api/v1/auth/pending-users     # List all users with status:"pending"
+POST   /api/v1/auth/approve-user/:id  # Set user status → "active", send approval email to user
+POST   /api/v1/auth/reject-user/:id   # Soft delete the pending user record
 ```
 
 ### Firms (admin only)
@@ -517,7 +566,9 @@ GET    /api/v1/firms/:firmId/mill-summary            # ?search= &mill= &status= 
 3. express.json()
 4. express.urlencoded()
 5. rateLimiter               — applied only to /api/v1/auth/login (10 req / 15 min / IP)
-6. authMiddleware            — verifies JWT, attaches req.user — applied to all routes except /auth/login and /auth/refresh
+6. authMiddleware            — verifies JWT, attaches req.user — applied to all routes except:
+                               /auth/login, /auth/refresh, /auth/logout,
+                               /auth/register, /auth/forgot-password, /auth/reset-password
 7. firmScopeMiddleware       — applied only to firm-scoped routes — checks req.user.firmId === req.params.firmId (skipped for admin)
 8. route handlers
 9. errorHandler              — global error handler at the bottom of app.ts
@@ -606,6 +657,18 @@ const beams = await prisma.beam.findMany({
   where: { firmId: req.params.firmId },
 });
 ```
+
+### Rule 7 — User registration flow
+
+New users who self-register via `POST /auth/register` are created with `status: "pending"` and
+cannot log in until an admin approves them. Two exceptions auto-approve immediately:
+
+1. **First-time setup** — if no user with a `SUPER_ADMIN_EMAILS` email exists in the DB yet,
+   the first registrant is auto-approved regardless of their email.
+2. **Super admin email** — if the registrant's email is in `SUPER_ADMIN_EMAILS` env var,
+   they are auto-approved with `role: "admin"`.
+
+Admin-created users (`POST /auth/users`) are always `status: "active"` — they skip the pending flow entirely.
 
 ---
 
@@ -709,6 +772,17 @@ Stored in httpOnly cookie: `{ httpOnly: true, secure: true, sameSite: 'strict', 
 **Password hashing:** Always use `bcryptjs.hash(password, 12)`.
 Never return `passwordHash` in any API response — always explicitly exclude it in Prisma selects.
 
+**Password reset tokens:** Stored in `password_reset_tokens` table. Each token is a 32-byte random hex
+string, expires in 1 hour, marked `usedAt` when consumed. Always check `usedAt === null` AND
+`expiresAt > now` before accepting a token.
+
+**Super admin emails:** Always read via `getSuperAdminEmails()` / `isSuperAdminEmail()` from
+`src/lib/superAdmin.ts`. Never hardcode emails in route or service files.
+
+**Email sending:** All calls to `mailer.ts` must be fire-and-forget — never `await` them on the
+critical response path. Always chain `.catch((err) => console.error(...))` so a mail failure never
+breaks the API response.
+
 ---
 
 ## 13. Response Shape Convention
@@ -746,6 +820,7 @@ All successful responses follow this structure:
     "zod": "^3.25.x", // Latest v3 stable
     "jsonwebtoken": "^9.0.x", // Latest stable, unchanged
     "bcryptjs": "^3.0.x", // v3 released 2025 — was ^2.x in old file
+    "nodemailer": "^6.9.x", // Email sending — approval requests, password resets
     "dotenv": "^16.5.x", // Latest stable
     "helmet": "^8.0.x", // v8 released 2024 — was ^7.x in old file
     "cors": "^2.8.x", // Latest stable, unchanged
@@ -766,6 +841,7 @@ All successful responses follow this structure:
     "@types/bcryptjs": "^2.4.x",
     "@types/cors": "^2.8.x",
     "@types/cookie-parser": "^1.4.x",
+    "@types/nodemailer": "^6.4.x", // Types for nodemailer
     "@types/pg": "^8.x",
     "@types/swagger-jsdoc": "^6.0.x",
     "@types/swagger-ui-express": "^4.1.x",
@@ -867,31 +943,31 @@ Run: `npm run generate:types` — done. All route types are available in the fro
 Prisma v7 removed `url = env("DATABASE_URL")` from the `datasource` block.
 Connection config now lives in **two places**:
 
-| Where | Purpose |
-|-------|---------|
-| `prisma.config.ts` (root) | Prisma CLI — used by `prisma migrate`, `prisma generate`, `prisma studio` |
-| `PrismaClient({ adapter })` in `src/lib/prisma.ts` | Runtime queries |
+| Where                                              | Purpose                                                                   |
+| -------------------------------------------------- | ------------------------------------------------------------------------- |
+| `prisma.config.ts` (root)                          | Prisma CLI — used by `prisma migrate`, `prisma generate`, `prisma studio` |
+| `PrismaClient({ adapter })` in `src/lib/prisma.ts` | Runtime queries                                                           |
 
 ```typescript
 // prisma.config.ts — CLI reads this for migrations
-import 'dotenv/config'
-import { defineConfig, env } from 'prisma/config'
+import "dotenv/config";
+import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
   datasource: {
-    url: env('DATABASE_URL'),   // use env() helper, not process.env — file is outside tsconfig rootDir
+    url: env("DATABASE_URL"), // use env() helper, not process.env — file is outside tsconfig rootDir
   },
-})
+});
 ```
 
 ```typescript
 // src/lib/prisma.ts — runtime client
-import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
 
 function createPrismaClient(): PrismaClient {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
-  return new PrismaClient({ adapter, log: ['error'] })
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+  return new PrismaClient({ adapter, log: ["error"] });
 }
 ```
 
@@ -905,26 +981,26 @@ Config file: `eslint.config.mjs` (flat config, always ESM via `.mjs` extension).
 
 ```javascript
 // eslint.config.mjs
-import eslint from '@eslint/js'
-import tseslint from 'typescript-eslint'
+import eslint from "@eslint/js";
+import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   eslint.configs.recommended,
   tseslint.configs.recommended,
   {
     rules: {
-      '@typescript-eslint/no-explicit-any': 'error',       // enforces Section 15 rule
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      "@typescript-eslint/no-explicit-any": "error", // enforces Section 15 rule
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
       ],
-      'no-console': ['error', { allow: ['error'] }],        // only console.error allowed
+      "no-console": ["error", { allow: ["error"] }], // only console.error allowed
     },
   },
   {
-    ignores: ['dist/**', 'node_modules/**'],
+    ignores: ["dist/**", "node_modules/**"],
   },
-)
+);
 ```
 
 **Scripts:**
@@ -936,11 +1012,11 @@ npm run lint:fix    # auto-fix where possible
 
 **Rule rationale:**
 
-| Rule | Why |
-|------|-----|
-| `@typescript-eslint/no-explicit-any: error` | Enforces the "no `any`" requirement from Section 15 |
-| `@typescript-eslint/no-unused-vars: error` | Catches dead variables; prefix with `_` to intentionally ignore |
-| `no-console` (allow `error`) | Section 15 — `console.log` forbidden, `console.error` allowed in dev |
+| Rule                                        | Why                                                                  |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `@typescript-eslint/no-explicit-any: error` | Enforces the "no `any`" requirement from Section 15                  |
+| `@typescript-eslint/no-unused-vars: error`  | Catches dead variables; prefix with `_` to intentionally ignore      |
+| `no-console` (allow `error`)                | Section 15 — `console.log` forbidden, `console.error` allowed in dev |
 
 ---
 
@@ -955,3 +1031,5 @@ npm run lint:fix    # auto-fix where possible
 - Do NOT skip `deletedAt: null` in any findMany/findFirst query
 - Do NOT use `console.log` for errors — use `console.error` in dev; replace with a logger in prod
 - Do NOT mutate `req.body` directly — destructure it first into typed variables
+- Do NOT hardcode super admin emails anywhere — always use `getSuperAdminEmails()` from `src/lib/superAdmin.ts`
+- Do NOT `await` email sends on the critical response path — fire-and-forget with `.catch((err) => console.error(...))`
