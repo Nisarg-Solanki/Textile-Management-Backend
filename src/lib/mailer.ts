@@ -1,0 +1,56 @@
+import nodemailer from "nodemailer";
+import { getSuperAdminEmails } from "./superAdmin";
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT ?? 587),
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+export function sendApprovalRequestEmail(
+  newUserName: string,
+  newUserEmail: string,
+): void {
+  const recipients = getSuperAdminEmails();
+  if (recipients.length === 0) return;
+
+  const link = `${process.env.FRONTEND_URL}/admin/pending-users`;
+
+  transporter
+    .sendMail({
+      to: recipients.join(", "),
+      subject: `New registration pending approval — ${newUserEmail}`,
+      text: `A new user has registered and is awaiting approval.\n\nName: ${newUserName}\nEmail: ${newUserEmail}\n\nReview pending users: ${link}`,
+    })
+    .catch((err: unknown) => console.error("Mail error:", err));
+}
+
+export function sendAccountApprovedEmail(toEmail: string, name: string): void {
+  const link = `${process.env.FRONTEND_URL}/login`;
+
+  transporter
+    .sendMail({
+      to: toEmail,
+      subject: "Your account has been approved",
+      text: `Hi ${name},\n\nYour account has been approved. You can now log in.\n\n${link}`,
+    })
+    .catch((err: unknown) => console.error("Mail error:", err));
+}
+
+export function sendPasswordResetEmail(
+  toEmail: string,
+  rawToken: string,
+): void {
+  const link = `${process.env.FRONTEND_URL}/reset-password?token=${rawToken}`;
+
+  transporter
+    .sendMail({
+      to: toEmail,
+      subject: "Reset your password",
+      text: `You requested a password reset. Use the link below — it expires in 1 hour.\n\n${link}\n\nIf you did not request this, ignore this email.`,
+    })
+    .catch((err: unknown) => console.error("Mail error:", err));
+}
