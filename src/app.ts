@@ -7,6 +7,7 @@ import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import { errorHandler } from "./lib/errors";
 import authRouter from "./routes/auth";
+import permissionsRouter from "./routes/permissions";
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.get("/api/v1/api-docs.json", (_req, res) => res.json(swaggerSpec));
 
 // Routes
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/permissions", permissionsRouter);
 
 // Health check
 app.get("/api/v1/health", (_req, res) => {
