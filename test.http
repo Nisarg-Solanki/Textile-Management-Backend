@@ -357,3 +357,129 @@ Authorization: Bearer ADMIN_TOKEN
 ### 49. GET /api/v1/beams — no 'beams' permission — expect 403 (replace ADMIN_TOKEN_NO_PERMISSION)
 GET http://localhost:4000/api/v1/beams
 Authorization: Bearer ADMIN_TOKEN_NO_PERMISSION
+
+###
+
+### --- PRODUCTION MODULE ---
+### Prerequisites: FIRM_ID must have challanEnable=true (run step 20 first)
+###                MACHINE_ID from step 28, BEAM_ID from step 38
+
+### 50. Grant production permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "production", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }]
+
+###
+
+### 51. POST /api/v1/production — create entry with challan (replace tokens and IDs)
+POST http://localhost:4000/api/v1/production
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "machineId": "MACHINE_ID",
+  "beamId": "BEAM_ID",
+  "entryDate": "2026-04-29T08:00:00.000Z",
+  "takaSrNo": "T-001",
+  "takaMeter": 125.50,
+  "productionQuality": "High",
+  "weight": 12.75,
+  "remark": "First entry",
+  "productionChallanNo": "CH-001"
+}
+
+###
+
+### 52. POST — duplicate takaSrNo — expect 409 TAKA_SR_NO_DUPLICATE
+POST http://localhost:4000/api/v1/production
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "machineId": "MACHINE_ID",
+  "beamId": "BEAM_ID",
+  "entryDate": "2026-04-29T09:00:00.000Z",
+  "takaSrNo": "T-001",
+  "takaMeter": 100.00,
+  "productionQuality": "Medium",
+  "weight": 10.00
+}
+
+###
+
+### 53. GET /api/v1/production — list all (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/production
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 54. GET ?firmId= filter (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/production?firmId=FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 55. GET ?search=T-001 — search by takaSrNo (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/production?search=T-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 56. GET ?date_from=2026-04-01 — date range filter (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/production?date_from=2026-04-01
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 57. GET ?date_from=2026-05-01 — future date, expect empty result (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/production?date_from=2026-05-01
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 58. GET /api/v1/production/:id — verify taka auto-created and linked (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 59. PUT /api/v1/production/:id — update remark (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
+PUT http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "remark": "Updated remark after review" }
+
+###
+
+### 60. PUT with forbidden mill fields — verify millName, millChallanNo, millOutvertId are stripped
+### Response must show millName: null (not "INJECTED MILL") — confirm via GET step 58 after
+PUT http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "remark": "With forbidden fields attempt",
+  "millName": "INJECTED MILL",
+  "millChallanNo": "INJECTED-99",
+  "millOutvertId": "fake-id",
+  "millInvertId": "fake-id",
+  "millOutvertDate": "2026-01-01T00:00:00.000Z"
+}
+
+###
+
+### 61. DELETE /api/v1/production/:id — soft delete record and linked taka (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
+### Create a second record first (step 51 with takaSrNo: T-002) to delete, so T-001 stays for mill tests
+DELETE http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 62. GET after delete — expect 404 PRODUCTION_NOT_FOUND (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN

@@ -3,3 +3,4 @@ node_modules/
 dist/
 .env
 *.js.map
+.claude/settings.local.json
