@@ -148,3 +148,39 @@ Content-Type: application/json
 ### 21. Delete firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
 DELETE http://localhost:4000/api/v1/firms/FIRM_ID
 Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 22. Create mill (replace SUPER_ADMIN_TOKEN)
+POST http://localhost:4000/api/v1/mills
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "millName": "Sunrise Mill", "millCode": "SRM01", "address": "Surat, Gujarat", "contactPerson": "Ravi Patel", "contactNumber": "9876543210" }
+
+###
+
+### 23. List all mills — test ?search= (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mills?search=Sunrise
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 24. Get single mill (replace SUPER_ADMIN_TOKEN and MILL_ID)
+GET http://localhost:4000/api/v1/mills/MILL_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 25. Update mill name (replace SUPER_ADMIN_TOKEN and MILL_ID)
+PUT http://localhost:4000/api/v1/mills/MILL_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "millName": "Sunrise Mill Updated" }
+
+###
+
+### 26. Delete mill (replace SUPER_ADMIN_TOKEN and MILL_ID)
+DELETE http://localhost:4000/api/v1/mills/MILL_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
