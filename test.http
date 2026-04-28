@@ -1,0 +1,108 @@
+### 1. Register with super admin email (auto-approved as super_admin)
+POST http://localhost:4000/api/v1/auth/register
+Content-Type: application/json
+
+{ "name": "Super Admin", "email": "solankinisarg815@example.com", "password": "Admin@1234" }
+
+###
+
+### 2. Duplicate super admin email registration
+POST http://localhost:4000/api/v1/auth/register
+Content-Type: application/json
+
+{ "name": "Super Admin", "email": "solankinisarg815@example.com", "password": "Admin@1234" }
+
+###
+
+### 3. Register a regular admin (pending)
+POST http://localhost:4000/api/v1/auth/register
+Content-Type: application/json
+
+{ "name": "Test Admin", "email": "testadmin@example.com", "password": "Test@1234" }
+
+###
+
+### 4. Try login as pending user
+POST http://localhost:4000/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "testadmin@example.com", "password": "Test@1234" }
+
+###
+
+### 5. Login as super admin — save token
+POST http://localhost:4000/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "solankinisarg815@example.com", "password": "Admin@1234" }
+
+###
+
+### 6. Get pending users (replace SUPER_ADMIN_TOKEN with token from step 5)
+GET http://localhost:4000/api/v1/auth/pending-users
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 7. Approve pending user (replace SUPER_ADMIN_TOKEN and USER_ID)
+POST http://localhost:4000/api/v1/auth/approve-user/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 8. Login as approved admin — save token
+POST http://localhost:4000/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "testadmin@example.com", "password": "Test@1234" }
+
+###
+
+### 9. Try to access beams with no permissions (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 10. Set permissions for the admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "beams", "canView": true, "canCreate": true, "canEdit": true, "canDelete": false }]
+
+###
+
+### 11. Get permissions for the admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+GET http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 12. Try beams again after permission grant (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 13. Try to delete a beam — no delete permission (replace ADMIN_TOKEN)
+DELETE http://localhost:4000/api/v1/beams/nonexistent-id
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 14. Forgot password
+POST http://localhost:4000/api/v1/auth/forgot-password
+Content-Type: application/json
+
+{ "email": "testadmin@example.com" }
+
+###
+
+### 15. Refresh token (uses httpOnly cookie set during login)
+POST http://localhost:4000/api/v1/auth/refresh
+
+###
+
+### 16. Logout
+POST http://localhost:4000/api/v1/auth/logout
