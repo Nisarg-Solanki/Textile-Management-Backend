@@ -106,3 +106,45 @@ POST http://localhost:4000/api/v1/auth/refresh
 
 ### 16. Logout
 POST http://localhost:4000/api/v1/auth/logout
+
+###
+
+### 17. Create firm (replace SUPER_ADMIN_TOKEN)
+POST http://localhost:4000/api/v1/firms
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmName": "Sunrise Textiles", "firmCode": "SRT01", "challanEnable": false, "address": "Surat, Gujarat", "contactPerson": "Rajesh Shah", "contactNumber": "9876543210" }
+
+###
+
+### 18. List all firms — verify created firm appears (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/firms
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 18b. Search firms by name (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/firms?search=Sunrise
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 19. Get single firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/firms/FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 20. Update firm — enable challan (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+PUT http://localhost:4000/api/v1/firms/FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "challanEnable": true }
+
+###
+
+### 21. Delete firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+DELETE http://localhost:4000/api/v1/firms/FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
