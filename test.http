@@ -483,3 +483,57 @@ Authorization: Bearer SUPER_ADMIN_TOKEN
 ### 62. GET after delete — expect 404 PRODUCTION_NOT_FOUND (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
 GET http://localhost:4000/api/v1/production/PRODUCTION_ID
 Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- TAKAS MODULE (read-only, auto-generated from production) ---
+### Prerequisites: production record + taka created in step 51 (T-001 / PRODUCTION_ID)
+
+### 63. Grant takas permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "takas", "canView": true, "canCreate": false, "canEdit": false, "canDelete": false }]
+
+###
+
+### 64. GET /api/v1/takas — list all takas; taka auto-created from step 51 should appear (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 65. GET /api/v1/takas?firmId=FIRM_ID — filter by firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/takas?firmId=FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 66. GET /api/v1/takas?search=T-001 — search by takaSrNo (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas?search=T-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 67. GET /api/v1/takas?beam_no=B-001 — filter by beam number (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas?beam_no=B-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 68. GET /api/v1/takas?meter_min=100 — filter by min meter (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas?meter_min=100
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 69. GET /api/v1/takas/:id — verify productionInfo linked with machine + firm (replace SUPER_ADMIN_TOKEN and TAKA_ID)
+GET http://localhost:4000/api/v1/takas/TAKA_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 70. GET /api/v1/takas/nonexistent — expect 404 TAKA_NOT_FOUND (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas/00000000-0000-0000-0000-000000000000
+Authorization: Bearer SUPER_ADMIN_TOKEN
