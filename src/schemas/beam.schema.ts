@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const createBeamSchema = z.object({
   firmId: z.string().uuid(),
-  beamNo: z.string().min(1),
+  beamNo: z.string().min(1).max(50),
   tar: z.number().int().positive(),
   beamQuality: z.string().min(1),
   takaQty: z.number().int().positive(),
@@ -10,3 +10,6 @@ export const createBeamSchema = z.object({
 });
 
 export const updateBeamSchema = createBeamSchema.partial();
+
+export type CreateBeamInput = z.infer<typeof createBeamSchema>;
+export type UpdateBeamInput = z.infer<typeof updateBeamSchema>;

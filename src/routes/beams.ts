@@ -163,6 +163,11 @@ router.post(
     const { firmId, beamNo, tar, beamQuality, takaQty, beamMeter } =
       createBeamSchema.parse(req.body);
 
+    const firm = await prisma.firm.findFirst({
+      where: { id: firmId, deletedAt: null },
+    });
+    if (!firm) throw new AppError(404, "Firm not found", "FIRM_NOT_FOUND");
+
     const duplicate = await prisma.beam.findFirst({
       where: { firmId, beamNo, deletedAt: null },
     });
@@ -170,7 +175,7 @@ router.post(
       throw new AppError(
         409,
         "Beam number already exists in this firm",
-        "BEAM_DUPLICATE",
+        "BEAM_NO_DUPLICATE",
       );
 
     const beam = await prisma.beam.create({
@@ -222,7 +227,7 @@ router.put(
         throw new AppError(
           409,
           "Beam number already exists in this firm",
-          "BEAM_DUPLICATE",
+          "BEAM_NO_DUPLICATE",
         );
     }
 

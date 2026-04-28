@@ -260,3 +260,100 @@ Authorization: Bearer ADMIN_TOKEN
 ### 36. GET /api/v1/machines — no 'machines' permission (use token with no machines permission — e.g. a fresh admin token)
 GET http://localhost:4000/api/v1/machines
 Authorization: Bearer ADMIN_TOKEN_NO_PERMISSION
+
+###
+
+### --- BEAMS MODULE ---
+
+### 37. Grant beams permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[
+  { "module": "beams", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }
+]
+
+###
+
+### 38. POST /api/v1/beams — create beam (replace ADMIN_TOKEN and FIRM_ID from step 17/18)
+POST http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "beamNo": "B-001", "tar": 120, "beamQuality": "High", "takaQty": 50, "beamMeter": 250.50 }
+
+###
+
+### 39. POST /api/v1/beams — create second beam (to delete later, no production records)
+POST http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "beamNo": "B-002", "tar": 80, "beamQuality": "Medium", "takaQty": 30, "beamMeter": 180.00 }
+
+###
+
+### 40. POST /api/v1/beams — duplicate beamNo — expect 409 BEAM_NO_DUPLICATE
+POST http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "beamNo": "B-001", "tar": 100, "beamQuality": "Low", "takaQty": 20, "beamMeter": 100.00 }
+
+###
+
+### 41. GET /api/v1/beams — list all (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 42. GET /api/v1/beams?firmId=FIRM_ID — filter by firm (replace ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/beams?firmId=FIRM_ID
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 43. GET /api/v1/beams?search=High — search by quality (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams?search=High
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 44. GET /api/v1/beams?quality=High — filter by quality (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams?quality=High
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 45. GET /api/v1/beams?meter_min=200 — filter by minimum meter (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams?meter_min=200
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 46. GET /api/v1/beams/:id — get single beam (replace ADMIN_TOKEN and BEAM_ID)
+GET http://localhost:4000/api/v1/beams/BEAM_ID
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 47. PUT /api/v1/beams/:id — update beamMeter (replace ADMIN_TOKEN and BEAM_ID)
+PUT http://localhost:4000/api/v1/beams/BEAM_ID
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "beamMeter": 300.75 }
+
+###
+
+### 48. DELETE /api/v1/beams/:id — delete beam with no production records (replace ADMIN_TOKEN and BEAM_ID_2)
+DELETE http://localhost:4000/api/v1/beams/BEAM_ID_2
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 49. GET /api/v1/beams — no 'beams' permission — expect 403 (replace ADMIN_TOKEN_NO_PERMISSION)
+GET http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN_NO_PERMISSION
