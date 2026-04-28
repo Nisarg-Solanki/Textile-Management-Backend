@@ -184,3 +184,79 @@ Content-Type: application/json
 ### 26. Delete mill (replace SUPER_ADMIN_TOKEN and MILL_ID)
 DELETE http://localhost:4000/api/v1/mills/MILL_ID
 Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MACHINES MODULE ---
+
+### 27. Grant machines permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[
+  { "module": "machines", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }
+]
+
+###
+
+### 28. POST /api/v1/machines — create machine (replace ADMIN_TOKEN and FIRM_ID from step 17/18)
+POST http://localhost:4000/api/v1/machines
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "machineNo": "M-001", "machineType": "Rapier", "status": "active", "remark": "Main loom" }
+
+###
+
+### 29. POST /api/v1/machines — create second machine to delete later (replace ADMIN_TOKEN and FIRM_ID)
+POST http://localhost:4000/api/v1/machines
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "machineNo": "M-002", "machineType": "Airjet", "status": "active" }
+
+###
+
+### 30. GET /api/v1/machines — list all (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/machines
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 31. GET /api/v1/machines?firmId= — filter by firm (replace ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/machines?firmId=FIRM_ID
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 32. GET /api/v1/machines?search=Rapier — search (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/machines?search=Rapier
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 33. GET /api/v1/machines/:id — get single (replace ADMIN_TOKEN and MACHINE_ID)
+GET http://localhost:4000/api/v1/machines/MACHINE_ID
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 34. PUT /api/v1/machines/:id — update status to inactive (replace ADMIN_TOKEN and MACHINE_ID)
+PUT http://localhost:4000/api/v1/machines/MACHINE_ID
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "status": "inactive" }
+
+###
+
+### 35. DELETE /api/v1/machines/:id — delete second machine (replace ADMIN_TOKEN and MACHINE_ID_2)
+DELETE http://localhost:4000/api/v1/machines/MACHINE_ID_2
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 36. GET /api/v1/machines — no 'machines' permission (use token with no machines permission — e.g. a fresh admin token)
+GET http://localhost:4000/api/v1/machines
+Authorization: Bearer ADMIN_TOKEN_NO_PERMISSION
