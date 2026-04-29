@@ -786,3 +786,51 @@ Authorization: Bearer SUPER_ADMIN_TOKEN
 ### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
 GET http://localhost:4000/api/v1/mill-inverts/INVERT_ID
 Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MACHINE INFO VIEW ---
+### Prerequisites: at least one production entry exists (step 51). Replace SUPER_ADMIN_TOKEN throughout.
+
+### 96. GET /api/v1/machine-info — latest production state per machine (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/machine-info
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 97. GET /api/v1/machine-info?firmId=FIRM_ID — filter by firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/machine-info?firmId=FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 98. GET /api/v1/machine-info?search=M-001 — search by machine number (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/machine-info?search=M-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MILL SUMMARY VIEW ---
+### Prerequisites: outvert (step 72) and invert (step 84) must both exist. Replace SUPER_ADMIN_TOKEN throughout.
+
+### 99. GET /api/v1/mill-summary — all takas with mill tracking status (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 100. GET /api/v1/mill-summary?status=sent — sent to mill, not yet returned (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary?status=sent
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 101. GET /api/v1/mill-summary?status=returned — fully returned from mill (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary?status=returned
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 102. GET /api/v1/mill-summary?status=pending — not yet sent to mill (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary?status=pending
+Authorization: Bearer SUPER_ADMIN_TOKEN
