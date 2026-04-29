@@ -537,3 +537,119 @@ Authorization: Bearer SUPER_ADMIN_TOKEN
 ### 70. GET /api/v1/takas/nonexistent — expect 404 TAKA_NOT_FOUND (replace SUPER_ADMIN_TOKEN)
 GET http://localhost:4000/api/v1/takas/00000000-0000-0000-0000-000000000000
 Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MILL OUTVERTS MODULE ---
+### Prerequisites: FIRM_ID, MILL_ID (from step 22), SUPER_ADMIN_TOKEN
+###                T-001 production entry must exist (step 51) — do NOT run step 61 (delete) before these tests
+
+### 71. Grant mill_outverts permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "mill_outverts", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }]
+
+###
+
+### 72. POST /api/v1/mill-outverts — create outvert with T-001 (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID)
+### Expect 201; outvertTakas array with T-001
+POST http://localhost:4000/api/v1/mill-outverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "outvertDate": "2026-04-29T10:00:00.000Z",
+  "firmChallanNo": "OUT-001",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 73. GET /api/v1/production/:id — verify millOutvertDate and millName are now auto-filled
+### (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID from step 51)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 74. GET /api/v1/mill-outverts — list; newly created outvert should appear (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-outverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 75. GET /api/v1/mill-outverts?search=OUT-001 — search by firmChallanNo (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-outverts?search=OUT-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 76. GET /api/v1/mill-outverts/:id — verify outvertTakas and productionInfos included
+### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
+GET http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 77. POST duplicate firmChallanNo — expect 409 CHALLAN_DUPLICATE (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID)
+POST http://localhost:4000/api/v1/mill-outverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "outvertDate": "2026-04-29T11:00:00.000Z",
+  "firmChallanNo": "OUT-001",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 78. POST with nonexistent takaSrNo — expect 400 TAKA_NOT_FOUND (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID)
+POST http://localhost:4000/api/v1/mill-outverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "outvertDate": "2026-04-29T11:00:00.000Z",
+  "firmChallanNo": "OUT-002",
+  "takaSrNos": ["DOES-NOT-EXIST"]
+}
+
+###
+
+### 79. PUT /api/v1/mill-outverts/:id — update outvertDate only
+### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
+PUT http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "outvertDate": "2026-04-30T08:00:00.000Z" }
+
+###
+
+### 80. DELETE /api/v1/mill-outverts/:id — soft delete; expect ProductionInfo mill fields cleared
+### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
+DELETE http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 81. GET /api/v1/production/:id — verify millOutvertDate and millName are now null after delete
+### (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID from step 51)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 82. GET /api/v1/mill-outverts/:id after delete — expect 404 MILL_OUTVERT_NOT_FOUND
+### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
+GET http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
