@@ -36,14 +36,16 @@ app.use(express.urlencoded({ extended: true }));
 // 5. cookie-parser — required to read httpOnly refresh token cookie
 app.use(cookieParser());
 
-// 6. rate limiter — login only (10 req / 15 min / IP)
-const loginRateLimiter = rateLimit({
+// 6. rate limiter — auth endpoints (10 req / 15 min / IP)
+const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use("/api/v1/auth/login", loginRateLimiter);
+app.use("/api/v1/auth/login", authRateLimiter);
+app.use("/api/v1/auth/register", authRateLimiter);
+app.use("/api/v1/auth/forgot-password", authRateLimiter);
 
 // Swagger / OpenAPI
 const swaggerSpec = swaggerJsdoc({
