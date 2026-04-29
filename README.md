@@ -22,17 +22,18 @@ Admin modules: Firm Management, Mill Management, Machine Management.
 
 ## Tech stack
 
-| Layer | Choice |
-|---|---|
-| Runtime | Node.js 22 LTS |
-| Language | TypeScript 5.8 (strict mode) |
-| Framework | Express 5 |
-| ORM | Prisma 7 |
-| Database | PostgreSQL 17 (local dev) / Neon (production) |
-| Validation | Zod 3 |
-| Auth | JWT — access token (15m) + refresh token (7d httpOnly cookie) |
-| API Docs | swagger-jsdoc + swagger-ui-express |
-| Dev server | ts-node-dev |
+| Layer      | Choice                                                        |
+| ---------- | ------------------------------------------------------------- |
+| Runtime    | Node.js 22 LTS                                                |
+| Language   | TypeScript 5.8 (strict mode)                                  |
+| Framework  | Express 5                                                     |
+| ORM        | Prisma 7                                                      |
+| Database   | PostgreSQL 17 (local dev) / Neon (production)                 |
+| Validation | Zod 3                                                         |
+| Auth       | JWT — access token (15m) + refresh token (7d httpOnly cookie) |
+| API Docs   | swagger-jsdoc + swagger-ui-express                            |
+| Testing    | Jest 30 + ts-jest + Supertest                                 |
+| Dev server | ts-node-dev                                                   |
 
 ---
 
@@ -82,32 +83,40 @@ JWT_REFRESH_EXPIRES_IN="7d"
 PORT=4000
 NODE_ENV="development"
 FRONTEND_URL="http://localhost:3000"
+
+# Comma-separated emails that are auto-approved as super_admin on registration
+SUPER_ADMIN_EMAILS="you@example.com"
+
+# SMTP for approval/reset emails (Gmail example)
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_USER="your@gmail.com"
+SMTP_PASS="your-app-password"
 ```
 
 ### 4. Run database migrations
 
-This creates all 11 tables in your local PostgreSQL database:
+This creates all tables in your local PostgreSQL database:
 
 ```bash
 npx prisma migrate dev --name init
 ```
 
 You should see output like:
+
 ```
 ✔ Generated Prisma Client
 The following migration(s) have been applied:
   migrations/20240101000000_init/migration.sql
 ```
 
-### 5. Seed the first admin user
+### 5. Seed the super admin user
 
 ```bash
 npx prisma db seed
 ```
 
-This creates:
-- **Email:** `admin@textile.com`
-- **Password:** `Admin@1234`
+This creates a `super_admin` user for each email listed in `SUPER_ADMIN_EMAILS` with the default password `Admin@1234`. Change the password immediately after first login.
 
 ### 6. Start the development server
 
@@ -125,20 +134,28 @@ Server running on port 4000
 
 Open these in your browser:
 
-| URL | Expected |
-|---|---|
-| `http://localhost:4000/api/v1/health` | `{ "success": true, "message": "OK" }` |
-| `http://localhost:4000/api/v1/api-docs` | Swagger UI — interactive API docs |
-| `http://localhost:4000/api/v1/api-docs.json` | Raw OpenAPI JSON spec |
+| URL                                          | Expected                               |
+| -------------------------------------------- | -------------------------------------- |
+| `http://localhost:4000/api/v1/health`        | `{ "success": true, "message": "OK" }` |
+| `http://localhost:4000/api/v1/api-docs`      | Swagger UI — interactive API docs      |
+| `http://localhost:4000/api/v1/api-docs.json` | Raw OpenAPI JSON spec                  |
 
 ---
 
 ## Available scripts
 
 ```bash
-npm run dev        # Start dev server with hot reload (ts-node-dev)
-npm run build      # Compile TypeScript to dist/
-npm run start      # Run compiled output (production)
+npm run dev            # Start dev server with hot reload (ts-node-dev)
+npm run build          # Compile TypeScript to dist/
+npm run start          # Run compiled output (production)
+npm run lint           # Check for lint errors
+npm run lint:fix       # Auto-fix lint errors where possible
+```
+
+```bash
+npm test               # Run all tests
+npm run test:watch     # Run tests in watch mode
+npm run test:coverage  # Run tests with coverage report
 ```
 
 ```bash
@@ -146,7 +163,7 @@ npx prisma migrate dev --name <migration-name>   # Apply schema changes to local
 npx prisma migrate deploy                         # Apply all migrations to production (Neon)
 npx prisma generate                               # Regenerate Prisma client after schema change
 npx prisma studio                                 # Open visual DB browser at localhost:5555
-npx prisma db seed                                # Run the seed file
+npx prisma db seed                                # Seed the first super_admin user
 ```
 
 ---
@@ -160,19 +177,20 @@ backend/
 │   ├── app.ts                 # Express setup — middleware, routes, swagger
 │   ├── middleware/
 │   │   ├── auth.ts            # JWT verification — attaches req.user
-│   │   └── firmScope.ts       # Firm isolation — blocks cross-firm access
+│   │   └── permission.ts      # requirePermission(module, action) — super_admin bypasses; admin checks AdminPermission
 │   ├── routes/
-│   │   ├── auth.ts            # POST /auth/login, /refresh, /logout
-│   │   ├── firms.ts           # CRUD — admin only
-│   │   ├── mills.ts           # CRUD — admin only
-│   │   ├── machines.ts        # CRUD — firm-scoped
-│   │   ├── beams.ts           # CRUD — firm-scoped
-│   │   ├── production.ts      # CRUD — firm-scoped, auto-creates Taka
+│   │   ├── auth.ts            # Login, refresh, logout, register, forgot/reset-password, user management
+│   │   ├── firms.ts           # CRUD — super_admin only
+│   │   ├── mills.ts           # CRUD — super_admin only
+│   │   ├── permissions.ts     # GET/PUT module permissions per admin — super_admin only
+│   │   ├── machines.ts        # CRUD — permission-gated
+│   │   ├── beams.ts           # CRUD — permission-gated
+│   │   ├── production.ts      # CRUD — auto-creates Taka atomically
 │   │   ├── takas.ts           # GET only — auto-generated view
-│   │   ├── millOutverts.ts    # CRUD — firm-scoped
-│   │   ├── millInverts.ts     # CRUD — firm-scoped
-│   │   ├── machineInfo.ts     # GET only — auto-generated view
-│   │   └── millSummary.ts     # GET only — consolidated mill view
+│   │   ├── millOutverts.ts    # CRUD — syncs ProductionInfo fields
+│   │   ├── millInverts.ts     # CRUD — syncs ProductionInfo fields
+│   │   ├── machineInfo.ts     # GET only — auto-generated machine status view
+│   │   └── millSummary.ts     # GET only — consolidated Taka mill journey view
 │   ├── schemas/               # Zod validation schemas per module
 │   ├── services/              # Business logic (atomic transactions)
 │   │   ├── production.service.ts
@@ -181,17 +199,34 @@ backend/
 │   ├── lib/
 │   │   ├── prisma.ts          # Prisma client singleton
 │   │   ├── jwt.ts             # signToken / verifyToken helpers
-│   │   └── errors.ts          # AppError class + global error handler
-│   └── types/
-│       └── express.d.ts       # Extends Express Request with req.user
+│   │   ├── errors.ts          # AppError class + global error handler
+│   │   ├── mailer.ts          # nodemailer — approval, reset, and approved emails
+│   │   └── superAdmin.ts      # getSuperAdminEmails() / isSuperAdminEmail()
+│   └── tests/
+│       ├── setup.ts           # Seeds process.env for all test files
+│       ├── tsconfig.json      # Extends tsconfig.test.json — adds jest + node types
+│       ├── auth.test.ts
+│       ├── beams.test.ts
+│       ├── firms.test.ts
+│       ├── machineInfo.test.ts
+│       ├── machines.test.ts
+│       ├── millInverts.test.ts
+│       ├── millOutverts.test.ts
+│       ├── millSummary.test.ts
+│       ├── mills.test.ts
+│       ├── permissions.test.ts
+│       ├── production.test.ts
+│       └── takas.test.ts
 ├── prisma/
-│   ├── schema.prisma          # Database schema — 11 tables
-│   ├── migrations/            # Auto-generated SQL migration history
-│   └── seed.ts                # Seeds the first admin user
+│   ├── schema.prisma          # Database schema
+│   └── migrations/            # Auto-generated SQL migration history
+├── prisma.config.ts           # Prisma v7 datasource config (DATABASE_URL)
+├── jest.config.ts             # Jest config — ts-jest preset, node environment
+├── eslint.config.mjs          # ESLint flat config — TypeScript rules
 ├── .env                       # Local environment variables (not in Git)
 ├── .env.example               # Template — copy this to .env
-├── .gitignore
-├── tsconfig.json
+├── tsconfig.json              # Production/dev config — module: NodeNext
+├── tsconfig.test.json         # Test overrides — module: CommonJS (required by Jest)
 └── package.json
 ```
 
@@ -200,39 +235,62 @@ backend/
 ## API overview
 
 All routes are prefixed with `/api/v1`. Protected routes require:
+
 ```
 Authorization: Bearer <accessToken>
 ```
 
 ### Auth (public)
 
-| Method | Endpoint | Description |
-|---|---|---|
-| POST | `/auth/login` | Login with email + password |
-| POST | `/auth/refresh` | Get new access token using refresh cookie |
-| POST | `/auth/logout` | Clear refresh token cookie |
+| Method | Endpoint                | Description                                                         |
+| ------ | ----------------------- | ------------------------------------------------------------------- |
+| POST   | `/auth/register`        | Register — auto-approved if super_admin email, else status: pending |
+| POST   | `/auth/login`           | Login with email + password                                         |
+| POST   | `/auth/refresh`         | Get new access token using refresh cookie                           |
+| POST   | `/auth/logout`          | Clear refresh token cookie                                          |
+| POST   | `/auth/forgot-password` | Send password reset link (always returns 200)                       |
+| POST   | `/auth/reset-password`  | Reset password via one-time token                                   |
 
-### Admin routes (require role: admin)
+### Auth (super_admin only)
 
-| Method | Endpoint | Description |
-|---|---|---|
-| GET/POST | `/firms` | List / create firms |
-| GET/PUT/DELETE | `/firms/:id` | Get / update / delete firm |
-| GET/POST | `/mills` | List / create mills |
-| GET/PUT/DELETE | `/mills/:id` | Get / update / delete mill |
+| Method | Endpoint                 | Description                                  |
+| ------ | ------------------------ | -------------------------------------------- |
+| POST   | `/auth/users`            | Create user directly — always status: active |
+| GET    | `/auth/pending-users`    | List all pending registrations               |
+| POST   | `/auth/approve-user/:id` | Approve a pending user                       |
+| POST   | `/auth/reject-user/:id`  | Reject (soft-delete) a pending user          |
 
-### Firm-scoped routes (all under `/firms/:firmId/`)
+### Permissions (super_admin only)
 
-| Module | Endpoints | Notes |
-|---|---|---|
-| Machines | `/machines` — full CRUD | `machine_no` unique per firm |
-| Beams | `/beams` — full CRUD | `beam_no` unique per firm |
-| Production Info | `/production` — full CRUD | Auto-creates Taka on save |
-| Takas | `/takas` — GET only | Auto-generated, no create/edit |
-| Mill Outverts | `/mill-outverts` — full CRUD | Syncs Mill fields in Production Info |
-| Mill Inverts | `/mill-inverts` — full CRUD | Syncs Mill fields in Production Info |
-| Machine Info | `/machine-info` — GET only | Auto-generated machine status |
-| Mill Summary | `/mill-summary` — GET only | Taka mill journey view |
+| Method | Endpoint                | Description                                 |
+| ------ | ----------------------- | ------------------------------------------- |
+| GET    | `/permissions/:adminId` | Get all module permissions for an admin     |
+| PUT    | `/permissions/:adminId` | Replace all module permissions for an admin |
+
+### Firm & Mill management (super_admin only)
+
+| Method         | Endpoint     | Description                     |
+| -------------- | ------------ | ------------------------------- |
+| GET/POST       | `/firms`     | List / create firms             |
+| GET/PUT/DELETE | `/firms/:id` | Get / update / soft-delete firm |
+| GET/POST       | `/mills`     | List / create mills             |
+| GET/PUT/DELETE | `/mills/:id` | Get / update / soft-delete mill |
+
+### Data routes (permission-gated)
+
+All data routes accept an optional `?firmId=` query param to filter by firm.
+Access is gated by the `AdminPermission` table — super_admin bypasses all checks.
+
+| Module          | Endpoints                    | Notes                                 |
+| --------------- | ---------------------------- | ------------------------------------- |
+| Machines        | `/machines` — full CRUD      | `machine_no` unique per firm          |
+| Beams           | `/beams` — full CRUD         | `beam_no` unique per firm             |
+| Production Info | `/production` — full CRUD    | Auto-creates Taka atomically on save  |
+| Takas           | `/takas` — GET only          | Auto-generated, no direct create/edit |
+| Mill Outverts   | `/mill-outverts` — full CRUD | Syncs mill fields in Production Info  |
+| Mill Inverts    | `/mill-inverts` — full CRUD  | Syncs mill fields in Production Info  |
+| Machine Info    | `/machine-info` — GET only   | Auto-generated machine status view    |
+| Mill Summary    | `/mill-summary` — GET only   | Taka mill journey view                |
 
 ### Search and filters
 
@@ -240,40 +298,59 @@ Every list endpoint accepts:
 
 ```
 ?search=     — searches all text columns (ILIKE)
+?firmId=     — filter by firm
 ?page=1      — page number (default: 1)
 ?limit=20    — results per page (default: 20, max: 100)
 ```
 
 Module-specific filters:
 
-| Module | Extra filters |
-|---|---|
-| Beams | `?quality=` `?meter_min=` `?meter_max=` |
-| Production Info | `?machine=` `?beam=` `?date_from=` `?date_to=` `?quality=` |
-| Mill Outverts/Inverts | `?mill=` `?date_from=` `?date_to=` |
-| Mill Summary | `?mill=` `?status=sent\|returned\|pending` `?date_from=` `?date_to=` |
+| Module                | Extra filters                                                        |
+| --------------------- | -------------------------------------------------------------------- |
+| Beams                 | `?quality=` `?meter_min=` `?meter_max=`                              |
+| Production Info       | `?machine=` `?beam=` `?date_from=` `?date_to=` `?quality=`           |
+| Mill Outverts/Inverts | `?mill=` `?date_from=` `?date_to=`                                   |
+| Mill Summary          | `?mill=` `?status=sent\|returned\|pending` `?date_from=` `?date_to=` |
 
 See full interactive docs at `http://localhost:4000/api/v1/api-docs` when running locally.
 
 ---
 
+## Testing
+
+Tests use **Jest + Supertest** and run against a fully mocked Prisma client — no real database connection needed.
+
+```bash
+npm test                        # run all tests once
+npm run test:watch              # watch mode — re-runs on file save
+npm run test:coverage           # run with coverage report
+npm test -- auth                # run a single file by name fragment
+```
+
+All test files live in `src/tests/`. Each file covers one route module.
+The `src/tests/setup.ts` file seeds all required `process.env` values — no `.env` file is read during tests.
+
+---
+
 ## Database
 
-### Tables (11 total)
+### Tables (13 total)
 
-| Table | Purpose |
-|---|---|
-| `firms` | Registered textile firms |
-| `mills` | External processing mills |
-| `machines` | Machines per firm (`machine_no` unique per firm) |
-| `beams` | Raw material beams (`beam_no` unique per firm) |
-| `production_info` | Central production records (`taka_sr_no` unique per firm) |
-| `takas` | Auto-generated from production_info |
-| `mill_outverts` | Fabric dispatch to mills (`firm_challan_no` unique per firm) |
-| `mill_outvert_takas` | Junction — one outvert, many Takas |
-| `mill_inverts` | Fabric receipt from mills (`mill_challan_no` unique globally) |
-| `mill_invert_takas` | Junction — one invert, many Takas |
-| `users` | Auth users (`email` unique globally) |
+| Table                   | Purpose                                                       |
+| ----------------------- | ------------------------------------------------------------- |
+| `firms`                 | Registered textile firms                                      |
+| `mills`                 | External processing mills                                     |
+| `machines`              | Machines per firm (`machine_no` unique per firm)              |
+| `beams`                 | Raw material beams (`beam_no` unique per firm)                |
+| `production_info`       | Central production records (`taka_sr_no` unique per firm)     |
+| `takas`                 | Auto-generated from production_info                           |
+| `mill_outverts`         | Fabric dispatch to mills (`firm_challan_no` unique per firm)  |
+| `mill_outvert_takas`    | Junction — one outvert, many Takas                            |
+| `mill_inverts`          | Fabric receipt from mills (`mill_challan_no` unique globally) |
+| `mill_invert_takas`     | Junction — one invert, many Takas                             |
+| `users`                 | Auth users (`email` unique globally)                          |
+| `admin_permissions`     | Module-level permissions per admin user                       |
+| `password_reset_tokens` | One-time tokens for password reset flow                       |
 
 ### Key constraints
 
@@ -282,7 +359,6 @@ See full interactive docs at `http://localhost:4000/api/v1/api-docs` when runnin
 - `taka_sr_no` — unique per firm
 - `firm_challan_no` — unique per firm
 - `mill_challan_no` — unique globally
-- `updated_at` — auto-updated by Prisma on every record change
 - All tables use soft delete (`deleted_at`) — no records are permanently removed
 
 ### Switching to production (Neon)
@@ -324,35 +400,27 @@ Re-run any time you add or change a backend route.
 
 ## Environment variables reference
 
-| Variable | Description | Example |
-|---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:pass@localhost:5432/textile_db` |
-| `JWT_ACCESS_SECRET` | Secret for signing access tokens (min 32 chars) | random string |
-| `JWT_REFRESH_SECRET` | Secret for signing refresh tokens — must differ from access secret | random string |
-| `JWT_ACCESS_EXPIRES_IN` | Access token lifetime | `15m` |
-| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime | `7d` |
-| `PORT` | Port the server listens on | `4000` |
-| `NODE_ENV` | Environment — affects error detail and cookie security | `development` or `production` |
-| `FRONTEND_URL` | Allowed CORS origin | `http://localhost:3000` |
-
----
-
-## Default admin credentials
-
-Seeded by `npx prisma db seed`:
-
-```
-Email:    admin@textile.com
-Password: Admin@1234
-```
-
-Change the password immediately after first login in production.
+| Variable                 | Description                                                        | Example                                                |
+| ------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------ |
+| `DATABASE_URL`           | PostgreSQL connection string                                       | `postgresql://postgres:pass@localhost:5432/textile_db` |
+| `JWT_ACCESS_SECRET`      | Secret for signing access tokens (min 32 chars)                    | random string                                          |
+| `JWT_REFRESH_SECRET`     | Secret for signing refresh tokens — must differ from access secret | random string                                          |
+| `JWT_ACCESS_EXPIRES_IN`  | Access token lifetime                                              | `15m`                                                  |
+| `JWT_REFRESH_EXPIRES_IN` | Refresh token lifetime                                             | `7d`                                                   |
+| `PORT`                   | Port the server listens on                                         | `4000`                                                 |
+| `NODE_ENV`               | Environment — affects error detail and cookie security             | `development` or `production`                          |
+| `FRONTEND_URL`           | Allowed CORS origin + used in email links                          | `http://localhost:3000`                                |
+| `SUPER_ADMIN_EMAILS`     | Comma-separated emails auto-approved as super_admin                | `admin@example.com`                                    |
+| `SMTP_HOST`              | SMTP server host                                                   | `smtp.gmail.com`                                       |
+| `SMTP_PORT`              | SMTP server port                                                   | `587`                                                  |
+| `SMTP_USER`              | SMTP login email                                                   | `your@gmail.com`                                       |
+| `SMTP_PASS`              | SMTP password or app password                                      | `xxxx xxxx xxxx xxxx`                                  |
 
 ---
 
 ## Notes for Claude Code
 
-This repo contains a `CLAUDE.md` file at the root with full project context —
+This repo contains a `CLAUDE.md` file in the `backend/` directory with full project context —
 schema, routes, business rules, naming conventions, and patterns.
 Claude Code reads this automatically at the start of every session.
 Do not delete or rename `CLAUDE.md`.

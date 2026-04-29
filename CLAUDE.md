@@ -32,6 +32,7 @@ Data records (machines, beams, production, etc.) still carry a `firmId` as a dat
 | Dev server  | ts-node-dev                                                  |
 | Environment | dotenv                                                       |
 | Linting     | ESLint v9 + typescript-eslint v8 (flat config)               |
+| Testing     | Jest v30 + ts-jest + Supertest (unit + integration)          |
 
 **Do NOT suggest switching frameworks, ORMs, or validation libraries mid-task.**
 **Do NOT use `any` type in TypeScript. Always type everything explicitly.**
@@ -45,8 +46,6 @@ backend/
 ├── src/
 │   ├── index.ts               # App entry point — starts Express server
 │   ├── app.ts                 # Express app setup — middleware, routes mounted here
-│   ├── prisma/
-│   │   └── schema.prisma      # Prisma schema — single source of DB truth
 │   ├── middleware/
 │   │   ├── auth.ts            # JWT verification — attaches req.user to every protected request
 │   │   └── permission.ts      # requirePermission(module, action) — super_admin bypasses; admin checks AdminPermission
@@ -80,20 +79,37 @@ backend/
 │   │   ├── production.service.ts   # Business logic for production + taka atomic writes
 │   │   ├── millOutvert.service.ts  # Business logic for outvert + production sync
 │   │   └── millInvert.service.ts   # Business logic for invert + production sync
-│   └── lib/
-│       ├── prisma.ts          # Prisma client singleton — import this everywhere
-│       ├── jwt.ts             # signToken, verifyToken helpers
-│       ├── errors.ts          # AppError class + error handler middleware
-│       ├── mailer.ts          # nodemailer — sendApprovalRequestEmail, sendPasswordResetEmail, sendAccountApprovedEmail
-│       └── superAdmin.ts      # getSuperAdminEmails(), isSuperAdminEmail() — reads SUPER_ADMIN_EMAILS env var
+│   ├── lib/
+│   │   ├── prisma.ts          # Prisma client singleton — import this everywhere
+│   │   ├── jwt.ts             # signToken, verifyToken helpers
+│   │   ├── errors.ts          # AppError class + error handler middleware
+│   │   ├── mailer.ts          # nodemailer — sendApprovalRequestEmail, sendPasswordResetEmail, sendAccountApprovedEmail
+│   │   └── superAdmin.ts      # getSuperAdminEmails(), isSuperAdminEmail() — reads SUPER_ADMIN_EMAILS env var
+│   └── tests/
+│       ├── setup.ts           # Jest global setup — seeds process.env for all test files
+│       ├── tsconfig.json      # Extends tsconfig.test.json — adds jest + node types
+│       ├── auth.test.ts
+│       ├── beams.test.ts
+│       ├── firms.test.ts
+│       ├── machineInfo.test.ts
+│       ├── machines.test.ts
+│       ├── millInverts.test.ts
+│       ├── millOutverts.test.ts
+│       ├── millSummary.test.ts
+│       ├── mills.test.ts
+│       ├── permissions.test.ts
+│       ├── production.test.ts
+│       └── takas.test.ts
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
 ├── prisma.config.ts           # Prisma v7 datasource config — DATABASE_URL lives here
+├── jest.config.ts             # Jest config — ts-jest preset, points to tsconfig.test.json
 ├── eslint.config.mjs          # ESLint flat config — TypeScript rules
 ├── .env
 ├── .env.example
-├── tsconfig.json
+├── tsconfig.json              # Production/dev TypeScript config — module: NodeNext
+├── tsconfig.test.json         # Test-only overrides — module: CommonJS (required by Jest)
 └── package.json
 ```
 
@@ -875,6 +891,22 @@ All successful responses follow this structure:
 
 ---
 
+## 15. What NOT to Do
+
+- Do NOT use `any` type anywhere in TypeScript
+- Do NOT use `prisma.model.delete()` — always soft delete
+- Do NOT use `req.user.firmId` for DB query scoping — users have no firmId; `firmId` is only an optional query-param filter
+- Do NOT write mill sync logic inside route handlers — put it in service files
+- Do NOT create/update `ProductionInfo` and `Taka` in separate DB calls — always use `prisma.$transaction`
+- Do NOT return `passwordHash` in any response — exclude it explicitly
+- Do NOT skip `deletedAt: null` in any findMany/findFirst query
+- Do NOT use `console.log` for errors — use `console.error` in dev; replace with a logger in prod
+- Do NOT mutate `req.body` directly — destructure it first into typed variables
+- Do NOT hardcode super admin emails anywhere — always use `getSuperAdminEmails()` from `src/lib/superAdmin.ts`
+- Do NOT `await` email sends on the critical response path — fire-and-forget with `.catch((err) => console.error(...))`
+- Do NOT skip `requirePermission` on any protected route — every non-public route must declare its module and action
+- Do NOT perform permission checks inside route handlers — always use the `requirePermission` middleware
+
 ---
 
 ## 16. OpenAPI Spec + Frontend Type Generation
@@ -1042,18 +1074,69 @@ npm run lint:fix    # auto-fix where possible
 
 ---
 
-## 15. What NOT to Do
+## 19. Testing
 
-- Do NOT use `any` type anywhere in TypeScript
-- Do NOT use `prisma.model.delete()` — always soft delete
-- Do NOT use `req.user.firmId` for DB query scoping — users have no firmId; `firmId` is only an optional query-param filter
-- Do NOT write mill sync logic inside route handlers — put it in service files
-- Do NOT create/update `ProductionInfo` and `Taka` in separate DB calls — always use `prisma.$transaction`
-- Do NOT return `passwordHash` in any response — exclude it explicitly
-- Do NOT skip `deletedAt: null` in any findMany/findFirst query
-- Do NOT use `console.log` for errors — use `console.error` in dev; replace with a logger in prod
-- Do NOT mutate `req.body` directly — destructure it first into typed variables
-- Do NOT hardcode super admin emails anywhere — always use `getSuperAdminEmails()` from `src/lib/superAdmin.ts`
-- Do NOT `await` email sends on the critical response path — fire-and-forget with `.catch((err) => console.error(...))`
-- Do NOT skip `requirePermission` on any protected route — every non-public route must declare its module and action
-- Do NOT perform permission checks inside route handlers — always use the `requirePermission` middleware
+### Stack
+
+| Tool        | Role                                                              |
+| ----------- | ----------------------------------------------------------------- |
+| Jest v30    | Test runner                                                       |
+| ts-jest     | Compiles TypeScript tests — uses `tsconfig.test.json`             |
+| Supertest   | HTTP integration testing — mounts `app` directly, no live server  |
+
+### Config files
+
+- `jest.config.ts` — preset: `ts-jest`, testMatch: `src/tests/**/*.test.ts`, setupFiles: `src/tests/setup.ts`
+- `tsconfig.test.json` — extends `tsconfig.json`, overrides `module: CommonJS` + `moduleResolution: node10` (Jest requires CJS; `ignoreDeprecations: "6.0"` silences the TS deprecation warning)
+- `src/tests/tsconfig.json` — thin file that extends `tsconfig.test.json` and adds `types: ["jest", "node"]`
+
+### Test environment setup (`src/tests/setup.ts`)
+
+Seeds all required `process.env` values before any test file runs — no `.env` file is read during tests.
+`DATABASE_URL` is set to a dummy value because Prisma is always mocked; no real DB connection is made.
+
+### Mocking strategy
+
+All tests use **unit-style mocking** — no real database or network calls.
+
+```typescript
+// Mock prisma at the top of every test file (hoisted by Jest)
+jest.mock("../lib/prisma", () => ({
+  prisma: {
+    user: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), ... },
+    $transaction: jest.fn(),
+  },
+}));
+
+// Mock mailer — fire-and-forget emails must not run in tests
+jest.mock("../lib/mailer", () => ({
+  sendApprovalRequestEmail: jest.fn(),
+  sendAccountApprovedEmail: jest.fn(),
+  sendPasswordResetEmail: jest.fn(),
+}));
+```
+
+### Running tests
+
+```bash
+npm test              # run all tests
+npm test -- --watch   # watch mode
+npm test -- auth      # run a single file by name fragment
+```
+
+### Test coverage — one file per route module
+
+| Test file              | Route covered            |
+| ---------------------- | ------------------------ |
+| `auth.test.ts`         | `/api/v1/auth/*`         |
+| `firms.test.ts`        | `/api/v1/firms`          |
+| `mills.test.ts`        | `/api/v1/mills`          |
+| `machines.test.ts`     | `/api/v1/machines`       |
+| `beams.test.ts`        | `/api/v1/beams`          |
+| `production.test.ts`   | `/api/v1/production`     |
+| `takas.test.ts`        | `/api/v1/takas`          |
+| `millOutverts.test.ts` | `/api/v1/mill-outverts`  |
+| `millInverts.test.ts`  | `/api/v1/mill-inverts`   |
+| `machineInfo.test.ts`  | `/api/v1/machine-info`   |
+| `millSummary.test.ts`  | `/api/v1/mill-summary`   |
+| `permissions.test.ts`  | `/api/v1/permissions`    |
