@@ -653,3 +653,136 @@ Authorization: Bearer SUPER_ADMIN_TOKEN
 ### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
 GET http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
 Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MILL INVERTS MODULE ---
+### Prerequisites: FIRM_ID, MILL_ID, SUPER_ADMIN_TOKEN
+###   Re-create the outvert first (step 72) so T-001 has millOutvertId set.
+###   OUTVERT_ID = id returned by step 72.
+
+### 83. Grant mill_inverts permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "mill_inverts", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }]
+
+###
+
+### 84. POST /api/v1/mill-inverts — create invert referencing the outvert from step 72
+### Expect 201; invertTakas contains T-001; millChallanNo = INV-001
+### (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID, OUTVERT_ID)
+POST http://localhost:4000/api/v1/mill-inverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "millOutvertId": "OUTVERT_ID",
+  "invertDate": "2026-04-29T14:00:00.000Z",
+  "millChallanNo": "INV-001",
+  "firmChallanNo": "FINV-001",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 85. GET /api/v1/production/:id — verify millChallanNo and millName are now filled
+### (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID from step 51)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 86. GET /api/v1/mill-inverts — list; newly created invert should appear (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-inverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 87. GET /api/v1/mill-inverts?search=INV-001 — search by millChallanNo (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-inverts?search=INV-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 88. GET /api/v1/mill-inverts/:id — verify invertTakas, mill, millOutvert, and productionInfos included
+### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
+GET http://localhost:4000/api/v1/mill-inverts/INVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 89. POST duplicate millChallanNo — expect 409 MILL_CHALLAN_DUPLICATE
+### (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID, OUTVERT_ID)
+POST http://localhost:4000/api/v1/mill-inverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "millOutvertId": "OUTVERT_ID",
+  "invertDate": "2026-04-29T15:00:00.000Z",
+  "millChallanNo": "INV-001",
+  "firmChallanNo": "FINV-002",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 90. POST duplicate firmChallanNo — expect 409 FIRM_CHALLAN_DUPLICATE
+### (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID, OUTVERT_ID)
+POST http://localhost:4000/api/v1/mill-inverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "millOutvertId": "OUTVERT_ID",
+  "invertDate": "2026-04-29T15:00:00.000Z",
+  "millChallanNo": "INV-002",
+  "firmChallanNo": "FINV-001",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 91. GET /api/v1/mill-summary — quick check that data flows through
+### (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 92. PUT /api/v1/mill-inverts/:id — update invertDate only
+### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
+PUT http://localhost:4000/api/v1/mill-inverts/INVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "invertDate": "2026-04-30T09:00:00.000Z" }
+
+###
+
+### 93. DELETE /api/v1/mill-inverts/:id — soft delete; expect ProductionInfo invert fields cleared
+### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
+DELETE http://localhost:4000/api/v1/mill-inverts/INVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 94. GET /api/v1/production/:id — verify millInvertId, millChallanNo, millName are now null
+### (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID from step 51)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 95. GET /api/v1/mill-inverts/:id after delete — expect 404 MILL_INVERT_NOT_FOUND
+### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
+GET http://localhost:4000/api/v1/mill-inverts/INVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
