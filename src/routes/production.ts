@@ -27,7 +27,7 @@ const router = Router();
  *       - in: query
  *         name: search
  *         schema: { type: string }
- *         description: Search takaSrNo, productionQuality, remark
+ *         description: Search takaSrNo, productionQuality name, remark
  *       - in: query
  *         name: machine
  *         schema: { type: string }
@@ -43,8 +43,8 @@ const router = Router();
  *         name: date_to
  *         schema: { type: string, format: date }
  *       - in: query
- *         name: quality
- *         schema: { type: string }
+ *         name: qualityId
+ *         schema: { type: string, format: uuid }
  *       - in: query
  *         name: firmId
  *         schema: { type: string }
@@ -70,7 +70,7 @@ router.get(
     const beam = req.query.beam as string | undefined;
     const date_from = req.query.date_from as string | undefined;
     const date_to = req.query.date_to as string | undefined;
-    const quality = req.query.quality as string | undefined;
+    const qualityId = req.query.qualityId as string | undefined;
     const firmId = req.query.firmId as string | undefined;
     const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
     const limit = Math.min(
@@ -84,7 +84,7 @@ router.get(
       ...(firmId && { firmId }),
       ...(machine && { machineId: machine }),
       ...(beam && { beamId: beam }),
-      ...(quality && { productionQuality: quality }),
+      ...(qualityId && { productionQualityId: qualityId }),
       ...((date_from || date_to) && {
         entryDate: {
           ...(date_from && { gte: new Date(date_from) }),
@@ -94,7 +94,7 @@ router.get(
       ...(search && {
         OR: [
           { takaSrNo: { contains: search, mode: "insensitive" as const } },
-          { productionQuality: { contains: search, mode: "insensitive" as const } },
+          { productionQuality: { name: { contains: search, mode: "insensitive" as const } } },
           { remark: { contains: search, mode: "insensitive" as const } },
         ],
       }),
@@ -109,8 +109,15 @@ router.get(
         orderBy: { entryDate: "desc" },
         include: {
           machine: { select: { id: true, machineNo: true, machineType: true } },
-          beam: { select: { id: true, beamNo: true, beamQuality: true } },
+          beam: {
+            select: {
+              id: true,
+              beamNo: true,
+              beamQuality: { select: { id: true, name: true } },
+            },
+          },
           taka: { select: { id: true, takaSrNo: true, takaMeter: true } },
+          productionQuality: { select: { id: true, name: true } },
         },
       }),
     ]);
@@ -151,8 +158,16 @@ router.get(
       where: { id: req.params.id as string, deletedAt: null },
       include: {
         machine: { select: { id: true, machineNo: true, machineType: true } },
-        beam: { select: { id: true, beamNo: true, beamQuality: true, beamMeter: true } },
+        beam: {
+          select: {
+            id: true,
+            beamNo: true,
+            beamMeter: true,
+            beamQuality: { select: { id: true, name: true } },
+          },
+        },
         taka: { select: { id: true, takaSrNo: true, takaMeter: true, createdAt: true } },
+        productionQuality: { select: { id: true, name: true } },
         millOutvert: { select: { id: true, firmChallanNo: true, outvertDate: true } },
         millInvert: { select: { id: true, millChallanNo: true, invertDate: true } },
       },
@@ -179,7 +194,7 @@ router.get(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [firmId, machineId, beamId, entryDate, takaSrNo, takaMeter, productionQuality, weight]
+ *             required: [firmId, machineId, beamId, entryDate, takaSrNo, takaMeter, productionQualityId, weight]
  *             properties:
  *               firmId: { type: string, format: uuid }
  *               machineId: { type: string, format: uuid }
@@ -187,7 +202,7 @@ router.get(
  *               entryDate: { type: string, format: date-time }
  *               takaSrNo: { type: string }
  *               takaMeter: { type: number }
- *               productionQuality: { type: string }
+ *               productionQualityId: { type: string, format: uuid }
  *               weight: { type: number }
  *               remark: { type: string }
  *               productionChallanNo: { type: string }
@@ -235,7 +250,7 @@ router.post(
  *             properties:
  *               takaSrNo: { type: string }
  *               takaMeter: { type: number }
- *               productionQuality: { type: string }
+ *               productionQualityId: { type: string, format: uuid }
  *               weight: { type: number }
  *               remark: { type: string }
  *               productionChallanNo: { type: string }

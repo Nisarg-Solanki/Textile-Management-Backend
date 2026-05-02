@@ -21,8 +21,8 @@ const router = Router();
  *         name: search
  *         schema: { type: string }
  *       - in: query
- *         name: quality
- *         schema: { type: string }
+ *         name: qualityId
+ *         schema: { type: string, format: uuid }
  *       - in: query
  *         name: meter_min
  *         schema: { type: number }
@@ -50,7 +50,7 @@ router.get(
   requirePermission("beams", "view"),
   async (req: Request, res: Response) => {
     const search = req.query.search as string | undefined;
-    const quality = req.query.quality as string | undefined;
+    const qualityId = req.query.qualityId as string | undefined;
     const meterMin = req.query.meter_min as string | undefined;
     const meterMax = req.query.meter_max as string | undefined;
     const firmId = req.query.firmId as string | undefined;
@@ -64,13 +64,13 @@ router.get(
     const where: Prisma.BeamWhereInput = {
       deletedAt: null,
       ...(firmId && { firmId }),
-      ...(quality && { beamQuality: quality }),
+      ...(qualityId && { beamQualityId: qualityId }),
       ...(meterMin && { beamMeter: { gte: new Prisma.Decimal(meterMin) } }),
       ...(meterMax && { beamMeter: { lte: new Prisma.Decimal(meterMax) } }),
       ...(search && {
         OR: [
           { beamNo: { contains: search, mode: "insensitive" as const } },
-          { beamQuality: { contains: search, mode: "insensitive" as const } },
+          { beamQuality: { name: { contains: search, mode: "insensitive" as const } } },
         ],
       }),
     };
@@ -82,6 +82,7 @@ router.get(
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
+        include: { beamQuality: { select: { id: true, name: true } } },
       }),
     ]);
 
@@ -119,7 +120,10 @@ router.get(
   async (req: Request, res: Response) => {
     const beam = await prisma.beam.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
-      include: { firm: { select: { id: true, firmName: true, firmCode: true } } },
+      include: {
+        firm: { select: { id: true, firmName: true, firmCode: true } },
+        beamQuality: { select: { id: true, name: true } },
+      },
     });
     if (!beam) throw new AppError(404, "Beam not found", "BEAM_NOT_FOUND");
 
@@ -141,17 +145,19 @@ router.get(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [firmId, beamNo, tar, beamQuality, takaQty, beamMeter]
+ *             required: [firmId, beamNo, tar, beamQualityId, takaQty, beamMeter]
  *             properties:
- *               firmId: { type: string }
+ *               firmId: { type: string, format: uuid }
  *               beamNo: { type: string }
  *               tar: { type: integer }
- *               beamQuality: { type: string }
+ *               beamQualityId: { type: string, format: uuid }
  *               takaQty: { type: integer }
  *               beamMeter: { type: number }
  *     responses:
  *       201:
  *         description: Beam created
+ *       404:
+ *         description: Firm or beam quality not found
  *       409:
  *         description: Duplicate beam number in this firm
  */
@@ -160,13 +166,19 @@ router.post(
   authMiddleware,
   requirePermission("beams", "create"),
   async (req: Request, res: Response) => {
-    const { firmId, beamNo, tar, beamQuality, takaQty, beamMeter } =
+    const { firmId, beamNo, tar, beamQualityId, takaQty, beamMeter } =
       createBeamSchema.parse(req.body);
 
     const firm = await prisma.firm.findFirst({
       where: { id: firmId, deletedAt: null },
     });
     if (!firm) throw new AppError(404, "Firm not found", "FIRM_NOT_FOUND");
+
+    const quality = await prisma.beamQuality.findFirst({
+      where: { id: beamQualityId, deletedAt: null },
+    });
+    if (!quality)
+      throw new AppError(404, "Beam quality not found", "BEAM_QUALITY_NOT_FOUND");
 
     const duplicate = await prisma.beam.findFirst({
       where: { firmId, beamNo, deletedAt: null },
@@ -179,7 +191,8 @@ router.post(
       );
 
     const beam = await prisma.beam.create({
-      data: { firmId, beamNo, tar, beamQuality, takaQty, beamMeter },
+      data: { firmId, beamNo, tar, beamQualityId, takaQty, beamMeter },
+      include: { beamQuality: { select: { id: true, name: true } } },
     });
 
     res.status(201).json({ success: true, data: beam, message: "Created successfully" });
@@ -231,7 +244,11 @@ router.put(
         );
     }
 
-    const beam = await prisma.beam.update({ where: { id }, data });
+    const beam = await prisma.beam.update({
+      where: { id },
+      data,
+      include: { beamQuality: { select: { id: true, name: true } } },
+    });
 
     res.json({ success: true, data: beam });
   },

@@ -75,68 +75,100 @@ model Machine {
   @@map("machines")
 }
 
-model Beam {
+model BeamQuality {
   id          String    @id @default(uuid())
-  firmId      String
-  beamNo      String
-  tar         Int
-  beamQuality String
-  takaQty     Int
-  beamMeter   Decimal   @db.Decimal(10, 2)
+  name        String    @unique                        // e.g. "60s", "40s/2" — unique globally
+  status      String    @default("active")             // "active" | "inactive"
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
+  beams       Beam[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("beam_qualities")
+}
+
+model Beam {
+  id              String    @id @default(uuid())
+  firmId          String
+  beamNo          String
+  tar             Int
+  beamQualityId   String                               // FK → BeamQuality.id
+  takaQty         Int
+  beamMeter       Decimal   @db.Decimal(10, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
   firm            Firm             @relation(fields: [firmId], references: [id])
+  beamQuality     BeamQuality      @relation(fields: [beamQualityId], references: [id])
   productionInfos ProductionInfo[]
   takas           Taka[]
 
   @@unique([firmId, beamNo])
   @@index([firmId])                      // firm-scope filter on every list query
-  @@index([firmId, beamQuality])         // filter by quality within a firm
+  @@index([firmId, beamQualityId])       // filter by quality within a firm
   @@index([firmId, deletedAt])           // soft-delete filter performance
   @@map("beams")
 }
 
-model ProductionInfo {
-  id                   String    @id @default(uuid())
-  firmId               String
-  machineId            String
-  beamId               String
-  entryDate            DateTime
-  takaSrNo             String
-  takaMeter            Decimal   @db.Decimal(10, 2)
-  productionQuality    String
-  weight               Decimal   @db.Decimal(10, 2)
-  remark               String?
-  productionChallanNo  String?                        // Only set if firm.challanEnable = true
-  millOutvertId        String?
-  millInvertId         String?
-  // Auto-filled from mill operations — never set directly by user
-  millOutvertDate      DateTime?
-  millChallanNo        String?                        // From mill_inverts.millChallanNo
-  millName             String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  deletedAt            DateTime?
+model ProductionQuality {
+  id              String    @id @default(uuid())
+  name            String    @unique                      // e.g. "Plain", "Twill" — unique globally
+  status          String    @default("active")           // "active" | "inactive"
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
-  firm        Firm         @relation(fields: [firmId], references: [id])
-  machine     Machine      @relation(fields: [machineId], references: [id])
-  beam        Beam         @relation(fields: [beamId], references: [id])
-  millOutvert MillOutvert? @relation(fields: [millOutvertId], references: [id])
-  millInvert  MillInvert?  @relation(fields: [millInvertId], references: [id])
-  taka        Taka?
+  productionInfos ProductionInfo[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("production_qualities")
+}
+
+model ProductionInfo {
+  id                      String    @id @default(uuid())
+  firmId                  String
+  machineId               String
+  beamId                  String
+  entryDate               DateTime
+  takaSrNo                String
+  takaMeter               Decimal   @db.Decimal(10, 2)
+  productionQualityId     String                         // FK → ProductionQuality.id
+  weight                  Decimal   @db.Decimal(10, 2)
+  remark                  String?
+  productionChallanNo     String?                        // Only set if firm.challanEnable = true
+  millOutvertId           String?
+  millInvertId            String?
+  // Auto-filled from mill operations — never set directly by user
+  millOutvertDate         DateTime?
+  millChallanNo           String?                        // From mill_inverts.millChallanNo
+  millName                String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  deletedAt               DateTime?
+
+  firm               Firm              @relation(fields: [firmId], references: [id])
+  machine            Machine           @relation(fields: [machineId], references: [id])
+  beam               Beam              @relation(fields: [beamId], references: [id])
+  productionQuality  ProductionQuality @relation(fields: [productionQualityId], references: [id])
+  millOutvert        MillOutvert?      @relation(fields: [millOutvertId], references: [id])
+  millInvert         MillInvert?       @relation(fields: [millInvertId], references: [id])
+  taka               Taka?
 
   @@unique([firmId, takaSrNo])
   @@unique([firmId, productionChallanNo])
-  @@index([firmId])                                    // firm-scope on all list queries
-  @@index([firmId, entryDate])                         // date range filter (most common filter)
-  @@index([firmId, machineId])                         // machine-info view — latest entry per machine
-  @@index([firmId, beamId])                            // filter by beam
-  @@index([firmId, productionQuality])                 // filter by quality
-  @@index([firmId, millOutvertId])                     // outvert sync lookup
-  @@index([firmId, millInvertId])                      // invert sync lookup
-  @@index([firmId, deletedAt])                         // soft-delete filter
+  @@index([firmId])                                       // firm-scope on all list queries
+  @@index([firmId, entryDate])                            // date range filter (most common filter)
+  @@index([firmId, machineId])                            // machine-info view — latest entry per machine
+  @@index([firmId, beamId])                               // filter by beam
+  @@index([firmId, productionQualityId])                  // filter by quality
+  @@index([firmId, millOutvertId])                        // outvert sync lookup
+  @@index([firmId, millInvertId])                         // invert sync lookup
+  @@index([firmId, deletedAt])                            // soft-delete filter
   @@map("production_info")
 }
 

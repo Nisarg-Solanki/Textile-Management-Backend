@@ -56,6 +56,8 @@ backend/
 │   │   │                      # POST /approve-user/:id, /reject-user/:id (super_admin)
 │   │   ├── firms.ts           # CRUD for firms (super_admin only)
 │   │   ├── mills.ts           # CRUD for mills (super_admin only)
+│   │   ├── beamQualities.ts   # CRUD for beam_qualities — /api/v1/beam-qualities
+│   │   ├── productionQualities.ts # CRUD for production_qualities — /api/v1/production-qualities
 │   │   ├── machines.ts        # CRUD for machines — /api/v1/machines
 │   │   ├── beams.ts           # CRUD for beams — /api/v1/beams
 │   │   ├── production.ts      # CRUD for production_info — /api/v1/production
@@ -69,6 +71,8 @@ backend/
 │   │   ├── auth.schema.ts
 │   │   ├── firm.schema.ts
 │   │   ├── mill.schema.ts
+│   │   ├── beamQuality.schema.ts
+│   │   ├── productionQuality.schema.ts
 │   │   ├── machine.schema.ts
 │   │   ├── beam.schema.ts
 │   │   ├── production.schema.ts
@@ -99,6 +103,8 @@ backend/
 │       ├── mills.test.ts
 │       ├── permissions.test.ts
 │       ├── production.test.ts
+│       ├── beamQualities.test.ts
+│       ├── productionQualities.test.ts
 │       └── takas.test.ts
 ├── prisma/
 │   ├── schema.prisma
@@ -237,68 +243,100 @@ model Machine {
   @@map("machines")
 }
 
-model Beam {
+model BeamQuality {
   id          String    @id @default(uuid())
-  firmId      String
-  beamNo      String
-  tar         Int
-  beamQuality String
-  takaQty     Int
-  beamMeter   Decimal   @db.Decimal(10, 2)
+  name        String    @unique                        // e.g. "60s", "40s/2" — unique globally
+  status      String    @default("active")             // "active" | "inactive"
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
+  beams       Beam[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("beam_qualities")
+}
+
+model Beam {
+  id              String    @id @default(uuid())
+  firmId          String
+  beamNo          String
+  tar             Int
+  beamQualityId   String                               // FK → BeamQuality.id
+  takaQty         Int
+  beamMeter       Decimal   @db.Decimal(10, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
   firm            Firm             @relation(fields: [firmId], references: [id])
+  beamQuality     BeamQuality      @relation(fields: [beamQualityId], references: [id])
   productionInfos ProductionInfo[]
   takas           Taka[]
 
   @@unique([firmId, beamNo])
   @@index([firmId])                      // firm-scope filter on every list query
-  @@index([firmId, beamQuality])         // filter by quality within a firm
+  @@index([firmId, beamQualityId])       // filter by quality within a firm
   @@index([firmId, deletedAt])           // soft-delete filter performance
   @@map("beams")
 }
 
-model ProductionInfo {
-  id                   String    @id @default(uuid())
-  firmId               String
-  machineId            String
-  beamId               String
-  entryDate            DateTime
-  takaSrNo             String
-  takaMeter            Decimal   @db.Decimal(10, 2)
-  productionQuality    String
-  weight               Decimal   @db.Decimal(10, 2)
-  remark               String?
-  productionChallanNo  String?                        // Only set if firm.challanEnable = true
-  millOutvertId        String?
-  millInvertId         String?
-  // Auto-filled from mill operations — never set directly by user
-  millOutvertDate      DateTime?
-  millChallanNo        String?                        // From mill_inverts.millChallanNo
-  millName             String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  deletedAt            DateTime?
+model ProductionQuality {
+  id              String    @id @default(uuid())
+  name            String    @unique                      // e.g. "Plain", "Twill" — unique globally
+  status          String    @default("active")           // "active" | "inactive"
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
-  firm        Firm         @relation(fields: [firmId], references: [id])
-  machine     Machine      @relation(fields: [machineId], references: [id])
-  beam        Beam         @relation(fields: [beamId], references: [id])
-  millOutvert MillOutvert? @relation(fields: [millOutvertId], references: [id])
-  millInvert  MillInvert?  @relation(fields: [millInvertId], references: [id])
-  taka        Taka?
+  productionInfos ProductionInfo[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("production_qualities")
+}
+
+model ProductionInfo {
+  id                      String    @id @default(uuid())
+  firmId                  String
+  machineId               String
+  beamId                  String
+  entryDate               DateTime
+  takaSrNo                String
+  takaMeter               Decimal   @db.Decimal(10, 2)
+  productionQualityId     String                         // FK → ProductionQuality.id
+  weight                  Decimal   @db.Decimal(10, 2)
+  remark                  String?
+  productionChallanNo     String?                        // Only set if firm.challanEnable = true
+  millOutvertId           String?
+  millInvertId            String?
+  // Auto-filled from mill operations — never set directly by user
+  millOutvertDate         DateTime?
+  millChallanNo           String?                        // From mill_inverts.millChallanNo
+  millName                String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  deletedAt               DateTime?
+
+  firm               Firm              @relation(fields: [firmId], references: [id])
+  machine            Machine           @relation(fields: [machineId], references: [id])
+  beam               Beam              @relation(fields: [beamId], references: [id])
+  productionQuality  ProductionQuality @relation(fields: [productionQualityId], references: [id])
+  millOutvert        MillOutvert?      @relation(fields: [millOutvertId], references: [id])
+  millInvert         MillInvert?       @relation(fields: [millInvertId], references: [id])
+  taka               Taka?
 
   @@unique([firmId, takaSrNo])
   @@unique([firmId, productionChallanNo])
-  @@index([firmId])                                    // firm-scope on all list queries
-  @@index([firmId, entryDate])                         // date range filter (most common filter)
-  @@index([firmId, machineId])                         // machine-info view — latest entry per machine
-  @@index([firmId, beamId])                            // filter by beam
-  @@index([firmId, productionQuality])                 // filter by quality
-  @@index([firmId, millOutvertId])                     // outvert sync lookup
-  @@index([firmId, millInvertId])                      // invert sync lookup
-  @@index([firmId, deletedAt])                         // soft-delete filter
+  @@index([firmId])                                       // firm-scope on all list queries
+  @@index([firmId, entryDate])                            // date range filter (most common filter)
+  @@index([firmId, machineId])                            // machine-info view — latest entry per machine
+  @@index([firmId, beamId])                               // filter by beam
+  @@index([firmId, productionQualityId])                  // filter by quality
+  @@index([firmId, millOutvertId])                        // outvert sync lookup
+  @@index([firmId, millInvertId])                         // invert sync lookup
+  @@index([firmId, deletedAt])                            // soft-delete filter
   @@map("production_info")
 }
 
@@ -432,7 +470,7 @@ model User {
 model AdminPermission {
   id        String  @id @default(uuid())
   userId    String
-  module    String  // "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
+  module    String  // "beam_qualities" | "production_qualities" | "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
   canView   Boolean @default(false)
   canCreate Boolean @default(false)
   canEdit   Boolean @default(false)
@@ -513,6 +551,26 @@ PUT    /api/v1/permissions/:adminId   # Set/replace all module permissions for a
                                       # Body: [{ module, canView, canCreate, canEdit, canDelete }, ...]
 ```
 
+### Beam Qualities
+
+```
+GET    /api/v1/beam-qualities        # ?search= &status=
+POST   /api/v1/beam-qualities        # Create beam quality — { name }
+GET    /api/v1/beam-qualities/:id    # Get single beam quality
+PUT    /api/v1/beam-qualities/:id    # Update beam quality
+DELETE /api/v1/beam-qualities/:id    # Soft delete (blocked if beams are linked)
+```
+
+### Production Qualities
+
+```
+GET    /api/v1/production-qualities        # ?search= &status=
+POST   /api/v1/production-qualities        # Create production quality — { name }
+GET    /api/v1/production-qualities/:id    # Get single production quality
+PUT    /api/v1/production-qualities/:id    # Update production quality
+DELETE /api/v1/production-qualities/:id    # Soft delete (blocked if production records are linked)
+```
+
 ### Firms (super_admin only)
 
 ```
@@ -546,7 +604,7 @@ DELETE /api/v1/machines/:id      # Soft delete
 ### Beams
 
 ```
-GET    /api/v1/beams             # ?search= &quality= &meter_min= &meter_max= &firmId=
+GET    /api/v1/beams             # ?search= &qualityId= &meter_min= &meter_max= &firmId=
 POST   /api/v1/beams             # Create beam
 GET    /api/v1/beams/:id         # Get single beam
 PUT    /api/v1/beams/:id         # Update beam
@@ -556,7 +614,7 @@ DELETE /api/v1/beams/:id         # Soft delete (blocked if production records ex
 ### Production Info
 
 ```
-GET    /api/v1/production        # ?search= &machine= &beam= &date_from= &date_to= &quality= &firmId=
+GET    /api/v1/production        # ?search= &machine= &beam= &date_from= &date_to= &qualityId= &firmId=
 POST   /api/v1/production        # Create + auto-create Taka (atomic transaction)
 GET    /api/v1/production/:id    # Get single entry with all linked data
 PUT    /api/v1/production/:id    # Update + sync Taka (atomic)
@@ -695,7 +753,23 @@ router.put('/:id', authMiddleware, requirePermission('machines', 'edit'),   asyn
 router.delete('/:id', authMiddleware, requirePermission('machines', 'delete'), async (req, res) => { ... });
 ```
 
-### Rule 7 — User registration flow
+### Rule 7 — Quality delete blocked if in use
+
+Before soft-deleting a `BeamQuality`, check whether any non-deleted `Beam` references it.
+Before soft-deleting a `ProductionQuality`, check whether any non-deleted `ProductionInfo` references it.
+If any exist, reject with 400.
+
+```typescript
+// In beam-qualities DELETE handler
+const count = await prisma.beam.count({ where: { beamQualityId: id, deletedAt: null } });
+if (count > 0) throw new AppError(400, 'Cannot delete — beams are linked', 'BEAM_QUALITY_IN_USE');
+
+// In production-qualities DELETE handler
+const count = await prisma.productionInfo.count({ where: { productionQualityId: id, deletedAt: null } });
+if (count > 0) throw new AppError(400, 'Cannot delete — production records are linked', 'PRODUCTION_QUALITY_IN_USE');
+```
+
+### Rule 8 — User registration flow
 
 New users who self-register via `POST /auth/register` are created with `role: "admin"`, `status: "pending"` and
 cannot log in until a super_admin approves them. Two exceptions auto-approve immediately:
@@ -725,11 +799,11 @@ const where = {
   ...(search && {
     OR: [
       { beamNo: { contains: search, mode: "insensitive" as const } },
-      { beamQuality: { contains: search, mode: "insensitive" as const } },
+      { beamQuality: { name: { contains: search, mode: "insensitive" as const } } },
     ],
   }),
   // Additional filters from query params:
-  ...(quality && { beamQuality: quality }),
+  ...(qualityId && { beamQualityId: qualityId }),   // filter by quality FK
   ...(meterMin && { beamMeter: { gte: new Prisma.Decimal(meterMin) } }),
   ...(meterMax && { beamMeter: { lte: new Prisma.Decimal(meterMax) } }),
 };
@@ -1131,6 +1205,8 @@ npm test -- auth      # run a single file by name fragment
 | `auth.test.ts`         | `/api/v1/auth/*`         |
 | `firms.test.ts`        | `/api/v1/firms`          |
 | `mills.test.ts`        | `/api/v1/mills`          |
+| `beamQualities.test.ts`       | `/api/v1/beam-qualities`       |
+| `productionQualities.test.ts` | `/api/v1/production-qualities` |
 | `machines.test.ts`     | `/api/v1/machines`       |
 | `beams.test.ts`        | `/api/v1/beams`          |
 | `production.test.ts`   | `/api/v1/production`     |

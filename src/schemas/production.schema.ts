@@ -7,7 +7,7 @@ export const createProductionSchema = z.object({
   entryDate: z.string().datetime(),
   takaSrNo: z.string().min(1),
   takaMeter: z.number().positive(),
-  productionQuality: z.string().min(1),
+  productionQualityId: z.string().uuid(),
   weight: z.number().positive(),
   remark: z.string().optional(),
   productionChallanNo: z.string().optional(),
@@ -17,5 +17,18 @@ export const createProductionSchema = z.object({
 // millOutvertDate, millChallanNo, millName) are intentionally absent.
 export const updateProductionSchema = createProductionSchema.partial();
 
+export const listProductionQuerySchema = z.object({
+  search: z.string().optional(),
+  machine: z.string().uuid().optional(),
+  beam: z.string().uuid().optional(),
+  date_from: z.string().optional(),
+  date_to: z.string().optional(),
+  qualityId: z.string().uuid().optional(),
+  firmId: z.string().uuid().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
 export type CreateProductionInput = z.infer<typeof createProductionSchema>;
 export type UpdateProductionInput = z.infer<typeof updateProductionSchema>;
+export type ListProductionQuery = z.infer<typeof listProductionQuerySchema>;
