@@ -81,8 +81,12 @@ backend/
 │   │   └── permission.schema.ts
 │   ├── services/
 │   │   ├── production.service.ts   # Business logic for production + taka atomic writes
+│   │   │                           # Defines productionInclude const + ProductionWithRelations type
+│   │   │                           # createProductionEntry / updateProductionEntry return enriched object
 │   │   ├── millOutvert.service.ts  # Business logic for outvert + production sync
+│   │   │                           # Defines millOutvertInclude const + MillOutvertWithRelations type
 │   │   └── millInvert.service.ts   # Business logic for invert + production sync
+│   │                               # Defines millInvertInclude const + MillInvertWithRelations type
 │   ├── lib/
 │   │   ├── prisma.ts          # Prisma client singleton — import this everywhere
 │   │   ├── jwt.ts             # signToken, verifyToken helpers
@@ -771,6 +775,57 @@ if (count > 0) throw new AppError(400, 'Cannot delete — production records are
 
 ### Rule 8 — User registration flow
 
+### Rule 9 — Always embed related objects; never return bare FK ids
+
+Every GET, POST, and PUT response must embed the full related object wherever a FK exists —
+the frontend must never need a second API call to resolve an id.
+
+**Standard include selects by relation type:**
+
+```typescript
+firm:             { select: { id: true, firmName: true, firmCode: true } }
+mill:             { select: { id: true, millName: true, millCode: true } }
+machine:          { select: { id: true, machineNo: true, machineType: true } }
+beam:             { select: { id: true, beamNo: true, beamMeter: true,
+                    beamQuality: { select: { id: true, name: true } } } }
+beamQuality:      { select: { id: true, name: true } }
+productionQuality:{ select: { id: true, name: true } }
+taka:             { select: { id: true, takaSrNo: true, takaMeter: true } }
+millOutvert:      { select: { id: true, firmChallanNo: true, outvertDate: true } }
+millInvert:       { select: { id: true, millChallanNo: true, invertDate: true } }
+```
+
+**Service pattern** — define a top-level include const, derive the return type from it,
+then `findUniqueOrThrow` at the end of every transaction:
+
+```typescript
+const productionInclude = {
+  firm: { select: { id: true, firmName: true, firmCode: true } },
+  machine: { select: { id: true, machineNo: true, machineType: true } },
+  beam: {
+    select: {
+      id: true, beamNo: true, beamMeter: true,
+      beamQuality: { select: { id: true, name: true } },
+    },
+  },
+  taka: { select: { id: true, takaSrNo: true, takaMeter: true } },
+  productionQuality: { select: { id: true, name: true } },
+} as const;
+
+type ProductionWithRelations = Prisma.ProductionInfoGetPayload<{
+  include: typeof productionInclude;
+}>;
+
+// At the end of every transaction — never return the plain model:
+return tx.productionInfo.findUniqueOrThrow({
+  where: { id: production.id },
+  include: productionInclude,
+});
+```
+
+**machineInfo view** — the data map returns `machine` (with nested `firm`) and `beam` as objects,
+not flat fields like `machineNo`, `firmId`, `beamNo`, `beamId`.
+
 New users who self-register via `POST /auth/register` are created with `role: "admin"`, `status: "pending"` and
 cannot log in until a super_admin approves them. Two exceptions auto-approve immediately:
 
@@ -919,6 +974,12 @@ All successful responses follow this structure:
 { success: false, message: 'Human readable message', code: 'ERROR_CODE' }
 ```
 
+**Related objects are always embedded** (see Rule 9). Every response that would otherwise
+contain a raw FK id (e.g. `firmId`, `machineId`, `beamId`) instead contains the full
+related object under the relation name (e.g. `firm`, `machine`, `beam`). The raw FK field
+is still present on the record — but the related object is always alongside it so the
+frontend never needs a second call.
+
 ---
 
 ## 14. Key Packages
@@ -980,6 +1041,9 @@ All successful responses follow this structure:
 - Do NOT `await` email sends on the critical response path — fire-and-forget with `.catch((err) => console.error(...))`
 - Do NOT skip `requirePermission` on any protected route — every non-public route must declare its module and action
 - Do NOT perform permission checks inside route handlers — always use the `requirePermission` middleware
+- Do NOT return bare FK ids without the related object — every GET/POST/PUT response must embed the full related object (see Rule 9); use `include` on every `create`, `update`, and `findMany`/`findFirst`/`findUniqueOrThrow` call
+- Do NOT return the plain Prisma model from service functions — services must always `findUniqueOrThrow` at the end of each transaction with the module's `*Include` const so the enriched type is returned
+- Do NOT use `beamQuality: true` (full include with all fields) when embedding quality objects — always use `{ select: { id: true, name: true } }` to avoid leaking `deletedAt` and audit timestamps
 
 ---
 

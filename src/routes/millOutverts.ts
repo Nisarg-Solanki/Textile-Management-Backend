@@ -94,6 +94,7 @@ router.get(
         take: limit,
         orderBy: { outvertDate: "desc" },
         include: {
+          firm: { select: { id: true, firmName: true, firmCode: true } },
           mill: { select: { id: true, millName: true, millCode: true } },
           outvertTakas: { select: { id: true, takaSrNo: true } },
         },
@@ -135,6 +136,7 @@ router.get(
     const outvert = await prisma.millOutvert.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
       include: {
+        firm: { select: { id: true, firmName: true, firmCode: true } },
         mill: { select: { id: true, millName: true, millCode: true } },
         outvertTakas: { select: { id: true, takaSrNo: true } },
         productionInfos: {

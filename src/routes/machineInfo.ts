@@ -56,7 +56,13 @@ router.get(
       orderBy: { createdAt: "desc" },
       distinct: ["machineId"],
       include: {
-        machine: { select: { id: true, machineNo: true, firmId: true } },
+        machine: {
+          select: {
+            id: true,
+            machineNo: true,
+            firm: { select: { id: true, firmName: true, firmCode: true } },
+          },
+        },
         beam: { select: { id: true, beamNo: true } },
       },
     });
@@ -77,10 +83,8 @@ router.get(
 
     const data = paginated.map((entry) => ({
       id: entry.id,
-      machineNo: entry.machine.machineNo,
-      firmId: entry.machine.firmId,
-      beamNo: entry.beam.beamNo,
-      beamId: entry.beamId,
+      machine: entry.machine,
+      beam: entry.beam,
       takaSrNo: entry.takaSrNo,
       takaMeter: entry.takaMeter,
       entryDate: entry.entryDate,

@@ -85,9 +85,14 @@ router.get(
         take: limit,
         orderBy: { createdAt: "desc" },
         include: {
-          beam: { select: { id: true, beamNo: true, beamQuality: true } },
+          firm: { select: { id: true, firmName: true, firmCode: true } },
+          beam: { select: { id: true, beamNo: true, beamQuality: { select: { id: true, name: true } } } },
           productionInfo: {
-            select: { id: true, entryDate: true, machineId: true },
+            select: {
+              id: true,
+              entryDate: true,
+              machine: { select: { id: true, machineNo: true, machineType: true } },
+            },
           },
         },
       }),
@@ -128,7 +133,8 @@ router.get(
     const taka = await prisma.taka.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
       include: {
-        beam: { select: { id: true, beamNo: true, beamQuality: true } },
+        firm: { select: { id: true, firmName: true, firmCode: true } },
+        beam: { select: { id: true, beamNo: true, beamQuality: { select: { id: true, name: true } } } },
         productionInfo: {
           include: {
             machine: { select: { id: true, machineNo: true, machineType: true } },

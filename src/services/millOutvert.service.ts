@@ -7,13 +7,19 @@ import {
   UpdateMillOutvertInput,
 } from "../schemas/millOutvert.schema";
 
-type MillOutvertWithTakas = Prisma.MillOutvertGetPayload<{
-  include: { outvertTakas: true };
+const millOutvertInclude = {
+  firm: { select: { id: true, firmName: true, firmCode: true } },
+  mill: { select: { id: true, millName: true, millCode: true } },
+  outvertTakas: { select: { id: true, takaSrNo: true } },
+} as const;
+
+type MillOutvertWithRelations = Prisma.MillOutvertGetPayload<{
+  include: typeof millOutvertInclude;
 }>;
 
 export async function createMillOutvert(
   data: CreateMillOutvertInput,
-): Promise<MillOutvertWithTakas> {
+): Promise<MillOutvertWithRelations> {
   // Step 1 — verify firm exists
   const firm = await prisma.firm.findFirst({
     where: { id: data.firmId, deletedAt: null },
@@ -88,7 +94,7 @@ export async function createMillOutvert(
 
     return tx.millOutvert.findUniqueOrThrow({
       where: { id: outvert.id },
-      include: { outvertTakas: true },
+      include: millOutvertInclude,
     });
   });
 }
@@ -96,7 +102,7 @@ export async function createMillOutvert(
 export async function updateMillOutvert(
   id: string,
   data: UpdateMillOutvertInput,
-): Promise<MillOutvertWithTakas> {
+): Promise<MillOutvertWithRelations> {
   // Step 1 — find existing outvert with its takas
   const existing = await prisma.millOutvert.findFirst({
     where: { id, deletedAt: null },
@@ -202,7 +208,7 @@ export async function updateMillOutvert(
 
     return tx.millOutvert.findUniqueOrThrow({
       where: { id },
-      include: { outvertTakas: true },
+      include: millOutvertInclude,
     });
   });
 }

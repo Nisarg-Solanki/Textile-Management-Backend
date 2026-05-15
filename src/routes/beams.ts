@@ -82,7 +82,10 @@ router.get(
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
-        include: { beamQuality: { select: { id: true, name: true } } },
+        include: {
+          firm: { select: { id: true, firmName: true, firmCode: true } },
+          beamQuality: { select: { id: true, name: true } },
+        },
       }),
     ]);
 
@@ -192,7 +195,10 @@ router.post(
 
     const beam = await prisma.beam.create({
       data: { firmId, beamNo, tar, beamQualityId, takaQty, beamMeter },
-      include: { beamQuality: { select: { id: true, name: true } } },
+      include: {
+        firm: { select: { id: true, firmName: true, firmCode: true } },
+        beamQuality: { select: { id: true, name: true } },
+      },
     });
 
     res.status(201).json({ success: true, data: beam, message: "Created successfully" });
@@ -247,7 +253,10 @@ router.put(
     const beam = await prisma.beam.update({
       where: { id },
       data,
-      include: { beamQuality: { select: { id: true, name: true } } },
+      include: {
+        firm: { select: { id: true, firmName: true, firmCode: true } },
+        beamQuality: { select: { id: true, name: true } },
+      },
     });
 
     res.json({ success: true, data: beam });

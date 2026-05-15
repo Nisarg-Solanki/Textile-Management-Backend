@@ -75,7 +75,7 @@ router.get(
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
-        include: { firm: { select: { id: true, firmName: true } } },
+        include: { firm: { select: { id: true, firmName: true, firmCode: true } } },
       }),
     ]);
 
@@ -113,7 +113,7 @@ router.get(
   async (req: Request, res: Response) => {
     const machine = await prisma.machine.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
-      include: { firm: { select: { id: true, firmName: true } } },
+      include: { firm: { select: { id: true, firmName: true, firmCode: true } } },
     });
     if (!machine)
       throw new AppError(404, "Machine not found", "MACHINE_NOT_FOUND");
@@ -176,6 +176,7 @@ router.post(
 
     const machine = await prisma.machine.create({
       data: { firmId, machineNo, machineType, status, remark },
+      include: { firm: { select: { id: true, firmName: true, firmCode: true } } },
     });
 
     res
@@ -232,7 +233,11 @@ router.put(
         );
     }
 
-    const machine = await prisma.machine.update({ where: { id }, data });
+    const machine = await prisma.machine.update({
+      where: { id },
+      data,
+      include: { firm: { select: { id: true, firmName: true, firmCode: true } } },
+    });
 
     res.json({ success: true, data: machine });
   },

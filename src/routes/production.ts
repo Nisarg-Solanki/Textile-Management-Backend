@@ -108,6 +108,7 @@ router.get(
         take: limit,
         orderBy: { entryDate: "desc" },
         include: {
+          firm: { select: { id: true, firmName: true, firmCode: true } },
           machine: { select: { id: true, machineNo: true, machineType: true } },
           beam: {
             select: {
@@ -157,6 +158,7 @@ router.get(
     const record = await prisma.productionInfo.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
       include: {
+        firm: { select: { id: true, firmName: true, firmCode: true } },
         machine: { select: { id: true, machineNo: true, machineType: true } },
         beam: {
           select: {

@@ -1,4 +1,4 @@
-import { ProductionInfo } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { AppError } from "../lib/errors";
 import { prisma } from "../lib/prisma";
@@ -7,9 +7,28 @@ import {
   UpdateProductionInput,
 } from "../schemas/production.schema";
 
+const productionInclude = {
+  firm: { select: { id: true, firmName: true, firmCode: true } },
+  machine: { select: { id: true, machineNo: true, machineType: true } },
+  beam: {
+    select: {
+      id: true,
+      beamNo: true,
+      beamMeter: true,
+      beamQuality: { select: { id: true, name: true } },
+    },
+  },
+  taka: { select: { id: true, takaSrNo: true, takaMeter: true } },
+  productionQuality: { select: { id: true, name: true } },
+} as const;
+
+type ProductionWithRelations = Prisma.ProductionInfoGetPayload<{
+  include: typeof productionInclude;
+}>;
+
 export async function createProductionEntry(
   data: CreateProductionInput,
-): Promise<ProductionInfo> {
+): Promise<ProductionWithRelations> {
   // Step 1 — verify firm exists
   const firm = await prisma.firm.findFirst({
     where: { id: data.firmId, deletedAt: null },
@@ -70,14 +89,17 @@ export async function createProductionEntry(
         beamId: production.beamId,
       },
     });
-    return production;
+    return tx.productionInfo.findUniqueOrThrow({
+      where: { id: production.id },
+      include: productionInclude,
+    });
   });
 }
 
 export async function updateProductionEntry(
   id: string,
   data: UpdateProductionInput,
-): Promise<ProductionInfo> {
+): Promise<ProductionWithRelations> {
   // Step 1 — verify record exists
   const existing = await prisma.productionInfo.findFirst({
     where: { id, deletedAt: null },
@@ -149,6 +171,9 @@ export async function updateProductionEntry(
       });
     }
 
-    return production;
+    return tx.productionInfo.findUniqueOrThrow({
+      where: { id: production.id },
+      include: productionInclude,
+    });
   });
 }

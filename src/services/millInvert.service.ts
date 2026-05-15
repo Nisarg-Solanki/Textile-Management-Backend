@@ -7,13 +7,20 @@ import {
   UpdateMillInvertInput,
 } from "../schemas/millInvert.schema";
 
-type MillInvertWithTakas = Prisma.MillInvertGetPayload<{
-  include: { invertTakas: true };
+const millInvertInclude = {
+  firm: { select: { id: true, firmName: true, firmCode: true } },
+  mill: { select: { id: true, millName: true, millCode: true } },
+  millOutvert: { select: { id: true, firmChallanNo: true, outvertDate: true } },
+  invertTakas: { select: { id: true, takaSrNo: true } },
+} as const;
+
+type MillInvertWithRelations = Prisma.MillInvertGetPayload<{
+  include: typeof millInvertInclude;
 }>;
 
 export async function createMillInvert(
   data: CreateMillInvertInput,
-): Promise<MillInvertWithTakas> {
+): Promise<MillInvertWithRelations> {
   // Step 1 — verify firm exists
   const firm = await prisma.firm.findFirst({
     where: { id: data.firmId, deletedAt: null },
@@ -110,7 +117,7 @@ export async function createMillInvert(
 
     return tx.millInvert.findUniqueOrThrow({
       where: { id: invert.id },
-      include: { invertTakas: true },
+      include: millInvertInclude,
     });
   });
 }
@@ -118,7 +125,7 @@ export async function createMillInvert(
 export async function updateMillInvert(
   id: string,
   data: UpdateMillInvertInput,
-): Promise<MillInvertWithTakas> {
+): Promise<MillInvertWithRelations> {
   // Step 1 — find existing invert with its takas
   const existing = await prisma.millInvert.findFirst({
     where: { id, deletedAt: null },
@@ -239,7 +246,7 @@ export async function updateMillInvert(
 
     return tx.millInvert.findUniqueOrThrow({
       where: { id },
-      include: { invertTakas: true },
+      include: millInvertInclude,
     });
   });
 }
