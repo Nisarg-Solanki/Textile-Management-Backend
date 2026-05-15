@@ -64,7 +64,12 @@ router.get("/", authMiddleware, async (req: Request, res: Response) => {
 
   const [total, data] = await Promise.all([
     prisma.firm.count({ where }),
-    prisma.firm.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" } }),
+    prisma.firm.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   res.json({
@@ -123,7 +128,9 @@ router.post("/", authMiddleware, async (req: Request, res: Response) => {
 
   const firm = await prisma.firm.create({ data });
 
-  res.status(201).json({ success: true, data: firm, message: "Created successfully" });
+  res
+    .status(201)
+    .json({ success: true, data: firm, message: "Created successfully" });
 });
 
 /**
@@ -181,7 +188,9 @@ router.put("/:id", authMiddleware, async (req: Request, res: Response) => {
   const id = req.params.id as string;
   const data = updateFirmSchema.parse(req.body);
 
-  const existing = await prisma.firm.findFirst({ where: { id, deletedAt: null } });
+  const existing = await prisma.firm.findFirst({
+    where: { id, deletedAt: null },
+  });
   if (!existing) throw new AppError(404, "Firm not found", "FIRM_NOT_FOUND");
 
   const firm = await prisma.firm.update({ where: { id }, data });
@@ -215,7 +224,9 @@ router.delete("/:id", authMiddleware, async (req: Request, res: Response) => {
 
   const id = req.params.id as string;
 
-  const existing = await prisma.firm.findFirst({ where: { id, deletedAt: null } });
+  const existing = await prisma.firm.findFirst({
+    where: { id, deletedAt: null },
+  });
   if (!existing) throw new AppError(404, "Firm not found", "FIRM_NOT_FOUND");
 
   const [machines, beams, productions] = await Promise.all([
@@ -225,7 +236,11 @@ router.delete("/:id", authMiddleware, async (req: Request, res: Response) => {
   ]);
 
   if (machines > 0 || beams > 0 || productions > 0)
-    throw new AppError(400, "Cannot delete firm with active data", "FIRM_IN_USE");
+    throw new AppError(
+      400,
+      "Cannot delete firm with active data",
+      "FIRM_IN_USE",
+    );
 
   await prisma.firm.update({ where: { id }, data: { deletedAt: new Date() } });
 

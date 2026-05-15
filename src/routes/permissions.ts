@@ -33,31 +33,27 @@ function assertSuperAdmin(req: Request): void {
  *       404:
  *         description: Admin user not found
  */
-router.get(
-  "/:adminId",
-  authMiddleware,
-  async (req: Request, res: Response) => {
-    assertSuperAdmin(req);
+router.get("/:adminId", authMiddleware, async (req: Request, res: Response) => {
+  assertSuperAdmin(req);
 
-    const adminId = req.params.adminId as string;
+  const adminId = req.params.adminId as string;
 
-    const user = await prisma.user.findFirst({
-      where: { id: adminId, role: "admin", deletedAt: null },
-      select: { id: true, name: true, email: true },
-    });
-    if (!user)
-      throw new AppError(404, "Admin user not found", "USER_NOT_FOUND");
+  const user = await prisma.user.findFirst({
+    where: { id: adminId, role: "admin", deletedAt: null },
+    select: { id: true, name: true, email: true },
+  });
+  console.log("user permission:>> ", user);
+  if (!user) throw new AppError(404, "Admin user not found", "USER_NOT_FOUND");
 
-    const permissions = await prisma.adminPermission.findMany({
-      where: { userId: adminId },
-    });
+  const permissions = await prisma.adminPermission.findMany({
+    where: { userId: adminId },
+  });
 
-    res.json({
-      success: true,
-      data: { user, permissions },
-    });
-  },
-);
+  res.json({
+    success: true,
+    data: { user, permissions },
+  });
+});
 
 /**
  * @openapi
@@ -101,39 +97,34 @@ router.get(
  *       404:
  *         description: Admin user not found
  */
-router.put(
-  "/:adminId",
-  authMiddleware,
-  async (req: Request, res: Response) => {
-    assertSuperAdmin(req);
+router.put("/:adminId", authMiddleware, async (req: Request, res: Response) => {
+  assertSuperAdmin(req);
 
-    const adminId = req.params.adminId as string;
-    const body = setPermissionsSchema.parse(req.body);
+  const adminId = req.params.adminId as string;
+  const body = setPermissionsSchema.parse(req.body);
 
-    const user = await prisma.user.findFirst({
-      where: { id: adminId, role: "admin", deletedAt: null },
-      select: { id: true, name: true, email: true },
+  const user = await prisma.user.findFirst({
+    where: { id: adminId, role: "admin", deletedAt: null },
+    select: { id: true, name: true, email: true },
+  });
+  if (!user) throw new AppError(404, "Admin user not found", "USER_NOT_FOUND");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.adminPermission.deleteMany({ where: { userId: adminId } });
+    await tx.adminPermission.createMany({
+      data: body.map((p) => ({ userId: adminId, ...p })),
     });
-    if (!user)
-      throw new AppError(404, "Admin user not found", "USER_NOT_FOUND");
+  });
 
-    await prisma.$transaction(async (tx) => {
-      await tx.adminPermission.deleteMany({ where: { userId: adminId } });
-      await tx.adminPermission.createMany({
-        data: body.map((p) => ({ userId: adminId, ...p })),
-      });
-    });
+  const permissions = await prisma.adminPermission.findMany({
+    where: { userId: adminId },
+  });
 
-    const permissions = await prisma.adminPermission.findMany({
-      where: { userId: adminId },
-    });
-
-    res.json({
-      success: true,
-      data: { user, permissions },
-      message: "Permissions updated successfully",
-    });
-  },
-);
+  res.json({
+    success: true,
+    data: { user, permissions },
+    message: "Permissions updated successfully",
+  });
+});
 
 export default router;

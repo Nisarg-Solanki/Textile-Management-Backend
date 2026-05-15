@@ -155,10 +155,15 @@ router.post("/login", async (req: Request, res: Response) => {
     .update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
     .catch((err: unknown) => console.error("lastLoginAt update failed:", err));
 
+  const permissions = await prisma.adminPermission.findMany({
+    where: { userId: user.id },
+  });
+
   res.json({
     success: true,
     data: {
       accessToken,
+      permissions,
       user: {
         id: user.id,
         name: user.name,
@@ -202,7 +207,18 @@ router.post("/refresh", async (req: Request, res: Response) => {
     email: user.email,
   });
 
-  res.json({ success: true, data: { accessToken } });
+  res.json({
+    success: true,
+    data: {
+      accessToken,
+      user: {
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        id: user.id,
+      },
+    },
+  });
 });
 
 /**
@@ -383,36 +399,33 @@ function assertSuperAdmin(req: Request): void {
  *       409:
  *         description: Email already in use
  */
-router.post(
-  "/users",
-  authMiddleware,
-  async (req: Request, res: Response) => {
-    assertSuperAdmin(req);
+router.post("/users", authMiddleware, async (req: Request, res: Response) => {
+  assertSuperAdmin(req);
 
-    const { name, email, password } = createUserByAdminSchema.parse(req.body);
+  const { name, email, password } = createUserByAdminSchema.parse(req.body);
 
-    const existing = await prisma.user.findFirst({
-      where: { email, deletedAt: null },
-    });
-    if (existing)
-      throw new AppError(409, "Email already in use", "EMAIL_TAKEN");
+  const existing = await prisma.user.findFirst({
+    where: { email, deletedAt: null },
+  });
+  if (existing) throw new AppError(409, "Email already in use", "EMAIL_TAKEN");
 
-    const passwordHash = await bcryptjs.hash(password, 12);
-    const user = await prisma.user.create({
-      data: { name, email, passwordHash, role: "admin", status: "active" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        status: true,
-        createdAt: true,
-      },
-    });
+  const passwordHash = await bcryptjs.hash(password, 12);
+  const user = await prisma.user.create({
+    data: { name, email, passwordHash, role: "admin", status: "active" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      status: true,
+      createdAt: true,
+    },
+  });
 
-    res.status(201).json({ success: true, data: user, message: "Created successfully" });
-  },
-);
+  res
+    .status(201)
+    .json({ success: true, data: user, message: "Created successfully" });
+});
 
 /**
  * @openapi
