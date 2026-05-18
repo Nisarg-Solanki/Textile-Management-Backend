@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { Prisma } from '@prisma/client';
+import { ZodError } from 'zod';
 
 export class AppError extends Error {
   constructor(
@@ -36,6 +37,19 @@ export function errorHandler(
       res.status(404).json({ success: false, message: 'Record not found.', code: 'NOT_FOUND' });
       return;
     }
+  }
+
+  if (err instanceof ZodError) {
+    res.status(400).json({
+      success: false,
+      message: 'Validation error',
+      code: 'VALIDATION_ERROR',
+      errors: err.errors.map((e) => ({
+        field: e.path.join('.'),
+        message: e.message,
+      })),
+    });
+    return;
   }
 
   if (process.env.NODE_ENV !== 'production') {

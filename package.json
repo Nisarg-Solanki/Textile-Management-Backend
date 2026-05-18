@@ -2,13 +2,18 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "index.js",
+  "prisma": {
+    "seed": "ts-node -P tsconfig.seed.json prisma/seed.ts"
+  },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "repository": {
     "type": "git",
@@ -46,13 +51,18 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.19.17",
     "@types/pg": "^8.20.0",
+    "@types/supertest": "^7.2.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "eslint": "^9.39.4",
+    "jest": "^30.3.0",
     "prisma": "^7.8.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.9",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.59.0"

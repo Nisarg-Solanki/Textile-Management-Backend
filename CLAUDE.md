@@ -32,6 +32,7 @@ Data records (machines, beams, production, etc.) still carry a `firmId` as a dat
 | Dev server  | ts-node-dev                                                  |
 | Environment | dotenv                                                       |
 | Linting     | ESLint v9 + typescript-eslint v8 (flat config)               |
+| Testing     | Jest v30 + ts-jest + Supertest (unit + integration)          |
 
 **Do NOT suggest switching frameworks, ORMs, or validation libraries mid-task.**
 **Do NOT use `any` type in TypeScript. Always type everything explicitly.**
@@ -45,8 +46,6 @@ backend/
 ├── src/
 │   ├── index.ts               # App entry point — starts Express server
 │   ├── app.ts                 # Express app setup — middleware, routes mounted here
-│   ├── prisma/
-│   │   └── schema.prisma      # Prisma schema — single source of DB truth
 │   ├── middleware/
 │   │   ├── auth.ts            # JWT verification — attaches req.user to every protected request
 │   │   └── permission.ts      # requirePermission(module, action) — super_admin bypasses; admin checks AdminPermission
@@ -57,6 +56,8 @@ backend/
 │   │   │                      # POST /approve-user/:id, /reject-user/:id (super_admin)
 │   │   ├── firms.ts           # CRUD for firms (super_admin only)
 │   │   ├── mills.ts           # CRUD for mills (super_admin only)
+│   │   ├── beamQualities.ts   # CRUD for beam_qualities — /api/v1/beam-qualities
+│   │   ├── productionQualities.ts # CRUD for production_qualities — /api/v1/production-qualities
 │   │   ├── machines.ts        # CRUD for machines — /api/v1/machines
 │   │   ├── beams.ts           # CRUD for beams — /api/v1/beams
 │   │   ├── production.ts      # CRUD for production_info — /api/v1/production
@@ -70,6 +71,8 @@ backend/
 │   │   ├── auth.schema.ts
 │   │   ├── firm.schema.ts
 │   │   ├── mill.schema.ts
+│   │   ├── beamQuality.schema.ts
+│   │   ├── productionQuality.schema.ts
 │   │   ├── machine.schema.ts
 │   │   ├── beam.schema.ts
 │   │   ├── production.schema.ts
@@ -78,22 +81,45 @@ backend/
 │   │   └── permission.schema.ts
 │   ├── services/
 │   │   ├── production.service.ts   # Business logic for production + taka atomic writes
+│   │   │                           # Defines productionInclude const + ProductionWithRelations type
+│   │   │                           # createProductionEntry / updateProductionEntry return enriched object
 │   │   ├── millOutvert.service.ts  # Business logic for outvert + production sync
+│   │   │                           # Defines millOutvertInclude const + MillOutvertWithRelations type
 │   │   └── millInvert.service.ts   # Business logic for invert + production sync
-│   └── lib/
-│       ├── prisma.ts          # Prisma client singleton — import this everywhere
-│       ├── jwt.ts             # signToken, verifyToken helpers
-│       ├── errors.ts          # AppError class + error handler middleware
-│       ├── mailer.ts          # nodemailer — sendApprovalRequestEmail, sendPasswordResetEmail, sendAccountApprovedEmail
-│       └── superAdmin.ts      # getSuperAdminEmails(), isSuperAdminEmail() — reads SUPER_ADMIN_EMAILS env var
+│   │                               # Defines millInvertInclude const + MillInvertWithRelations type
+│   ├── lib/
+│   │   ├── prisma.ts          # Prisma client singleton — import this everywhere
+│   │   ├── jwt.ts             # signToken, verifyToken helpers
+│   │   ├── errors.ts          # AppError class + error handler middleware
+│   │   ├── mailer.ts          # nodemailer — sendApprovalRequestEmail, sendPasswordResetEmail, sendAccountApprovedEmail
+│   │   └── superAdmin.ts      # getSuperAdminEmails(), isSuperAdminEmail() — reads SUPER_ADMIN_EMAILS env var
+│   └── tests/
+│       ├── setup.ts           # Jest global setup — seeds process.env for all test files
+│       ├── tsconfig.json      # Extends tsconfig.test.json — adds jest + node types
+│       ├── auth.test.ts
+│       ├── beams.test.ts
+│       ├── firms.test.ts
+│       ├── machineInfo.test.ts
+│       ├── machines.test.ts
+│       ├── millInverts.test.ts
+│       ├── millOutverts.test.ts
+│       ├── millSummary.test.ts
+│       ├── mills.test.ts
+│       ├── permissions.test.ts
+│       ├── production.test.ts
+│       ├── beamQualities.test.ts
+│       ├── productionQualities.test.ts
+│       └── takas.test.ts
 ├── prisma/
 │   ├── schema.prisma
 │   └── migrations/
 ├── prisma.config.ts           # Prisma v7 datasource config — DATABASE_URL lives here
+├── jest.config.ts             # Jest config — ts-jest preset, points to tsconfig.test.json
 ├── eslint.config.mjs          # ESLint flat config — TypeScript rules
 ├── .env
 ├── .env.example
-├── tsconfig.json
+├── tsconfig.json              # Production/dev TypeScript config — module: NodeNext
+├── tsconfig.test.json         # Test-only overrides — module: CommonJS (required by Jest)
 └── package.json
 ```
 
@@ -221,68 +247,100 @@ model Machine {
   @@map("machines")
 }
 
-model Beam {
+model BeamQuality {
   id          String    @id @default(uuid())
-  firmId      String
-  beamNo      String
-  tar         Int
-  beamQuality String
-  takaQty     Int
-  beamMeter   Decimal   @db.Decimal(10, 2)
+  name        String    @unique                        // e.g. "60s", "40s/2" — unique globally
+  status      String    @default("active")             // "active" | "inactive"
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
+  beams       Beam[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("beam_qualities")
+}
+
+model Beam {
+  id              String    @id @default(uuid())
+  firmId          String
+  beamNo          String
+  tar             Int
+  beamQualityId   String                               // FK → BeamQuality.id
+  takaQty         Int
+  beamMeter       Decimal   @db.Decimal(10, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
   firm            Firm             @relation(fields: [firmId], references: [id])
+  beamQuality     BeamQuality      @relation(fields: [beamQualityId], references: [id])
   productionInfos ProductionInfo[]
   takas           Taka[]
 
   @@unique([firmId, beamNo])
   @@index([firmId])                      // firm-scope filter on every list query
-  @@index([firmId, beamQuality])         // filter by quality within a firm
+  @@index([firmId, beamQualityId])       // filter by quality within a firm
   @@index([firmId, deletedAt])           // soft-delete filter performance
   @@map("beams")
 }
 
-model ProductionInfo {
-  id                   String    @id @default(uuid())
-  firmId               String
-  machineId            String
-  beamId               String
-  entryDate            DateTime
-  takaSrNo             String
-  takaMeter            Decimal   @db.Decimal(10, 2)
-  productionQuality    String
-  weight               Decimal   @db.Decimal(10, 2)
-  remark               String?
-  productionChallanNo  String?                        // Only set if firm.challanEnable = true
-  millOutvertId        String?
-  millInvertId         String?
-  // Auto-filled from mill operations — never set directly by user
-  millOutvertDate      DateTime?
-  millChallanNo        String?                        // From mill_inverts.millChallanNo
-  millName             String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
-  deletedAt            DateTime?
+model ProductionQuality {
+  id              String    @id @default(uuid())
+  name            String    @unique                      // e.g. "Plain", "Twill" — unique globally
+  status          String    @default("active")           // "active" | "inactive"
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
-  firm        Firm         @relation(fields: [firmId], references: [id])
-  machine     Machine      @relation(fields: [machineId], references: [id])
-  beam        Beam         @relation(fields: [beamId], references: [id])
-  millOutvert MillOutvert? @relation(fields: [millOutvertId], references: [id])
-  millInvert  MillInvert?  @relation(fields: [millInvertId], references: [id])
-  taka        Taka?
+  productionInfos ProductionInfo[]
+
+  @@index([status])
+  @@index([deletedAt])
+  @@map("production_qualities")
+}
+
+model ProductionInfo {
+  id                      String    @id @default(uuid())
+  firmId                  String
+  machineId               String
+  beamId                  String
+  entryDate               DateTime
+  takaSrNo                String
+  takaMeter               Decimal   @db.Decimal(10, 2)
+  productionQualityId     String                         // FK → ProductionQuality.id
+  weight                  Decimal   @db.Decimal(10, 2)
+  remark                  String?
+  productionChallanNo     String?                        // Only set if firm.challanEnable = true
+  millOutvertId           String?
+  millInvertId            String?
+  // Auto-filled from mill operations — never set directly by user
+  millOutvertDate         DateTime?
+  millChallanNo           String?                        // From mill_inverts.millChallanNo
+  millName                String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  deletedAt               DateTime?
+
+  firm               Firm              @relation(fields: [firmId], references: [id])
+  machine            Machine           @relation(fields: [machineId], references: [id])
+  beam               Beam              @relation(fields: [beamId], references: [id])
+  productionQuality  ProductionQuality @relation(fields: [productionQualityId], references: [id])
+  millOutvert        MillOutvert?      @relation(fields: [millOutvertId], references: [id])
+  millInvert         MillInvert?       @relation(fields: [millInvertId], references: [id])
+  taka               Taka?
 
   @@unique([firmId, takaSrNo])
   @@unique([firmId, productionChallanNo])
-  @@index([firmId])                                    // firm-scope on all list queries
-  @@index([firmId, entryDate])                         // date range filter (most common filter)
-  @@index([firmId, machineId])                         // machine-info view — latest entry per machine
-  @@index([firmId, beamId])                            // filter by beam
-  @@index([firmId, productionQuality])                 // filter by quality
-  @@index([firmId, millOutvertId])                     // outvert sync lookup
-  @@index([firmId, millInvertId])                      // invert sync lookup
-  @@index([firmId, deletedAt])                         // soft-delete filter
+  @@index([firmId])                                       // firm-scope on all list queries
+  @@index([firmId, entryDate])                            // date range filter (most common filter)
+  @@index([firmId, machineId])                            // machine-info view — latest entry per machine
+  @@index([firmId, beamId])                               // filter by beam
+  @@index([firmId, productionQualityId])                  // filter by quality
+  @@index([firmId, millOutvertId])                        // outvert sync lookup
+  @@index([firmId, millInvertId])                         // invert sync lookup
+  @@index([firmId, deletedAt])                            // soft-delete filter
   @@map("production_info")
 }
 
@@ -416,7 +474,7 @@ model User {
 model AdminPermission {
   id        String  @id @default(uuid())
   userId    String
-  module    String  // "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
+  module    String  // "beam_qualities" | "production_qualities" | "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
   canView   Boolean @default(false)
   canCreate Boolean @default(false)
   canEdit   Boolean @default(false)
@@ -497,6 +555,26 @@ PUT    /api/v1/permissions/:adminId   # Set/replace all module permissions for a
                                       # Body: [{ module, canView, canCreate, canEdit, canDelete }, ...]
 ```
 
+### Beam Qualities
+
+```
+GET    /api/v1/beam-qualities        # ?search= &status=
+POST   /api/v1/beam-qualities        # Create beam quality — { name }
+GET    /api/v1/beam-qualities/:id    # Get single beam quality
+PUT    /api/v1/beam-qualities/:id    # Update beam quality
+DELETE /api/v1/beam-qualities/:id    # Soft delete (blocked if beams are linked)
+```
+
+### Production Qualities
+
+```
+GET    /api/v1/production-qualities        # ?search= &status=
+POST   /api/v1/production-qualities        # Create production quality — { name }
+GET    /api/v1/production-qualities/:id    # Get single production quality
+PUT    /api/v1/production-qualities/:id    # Update production quality
+DELETE /api/v1/production-qualities/:id    # Soft delete (blocked if production records are linked)
+```
+
 ### Firms (super_admin only)
 
 ```
@@ -530,7 +608,7 @@ DELETE /api/v1/machines/:id      # Soft delete
 ### Beams
 
 ```
-GET    /api/v1/beams             # ?search= &quality= &meter_min= &meter_max= &firmId=
+GET    /api/v1/beams             # ?search= &qualityId= &meter_min= &meter_max= &firmId=
 POST   /api/v1/beams             # Create beam
 GET    /api/v1/beams/:id         # Get single beam
 PUT    /api/v1/beams/:id         # Update beam
@@ -540,7 +618,7 @@ DELETE /api/v1/beams/:id         # Soft delete (blocked if production records ex
 ### Production Info
 
 ```
-GET    /api/v1/production        # ?search= &machine= &beam= &date_from= &date_to= &quality= &firmId=
+GET    /api/v1/production        # ?search= &machine= &beam= &date_from= &date_to= &qualityId= &firmId=
 POST   /api/v1/production        # Create + auto-create Taka (atomic transaction)
 GET    /api/v1/production/:id    # Get single entry with all linked data
 PUT    /api/v1/production/:id    # Update + sync Taka (atomic)
@@ -679,7 +757,74 @@ router.put('/:id', authMiddleware, requirePermission('machines', 'edit'),   asyn
 router.delete('/:id', authMiddleware, requirePermission('machines', 'delete'), async (req, res) => { ... });
 ```
 
-### Rule 7 — User registration flow
+### Rule 7 — Quality delete blocked if in use
+
+Before soft-deleting a `BeamQuality`, check whether any non-deleted `Beam` references it.
+Before soft-deleting a `ProductionQuality`, check whether any non-deleted `ProductionInfo` references it.
+If any exist, reject with 400.
+
+```typescript
+// In beam-qualities DELETE handler
+const count = await prisma.beam.count({ where: { beamQualityId: id, deletedAt: null } });
+if (count > 0) throw new AppError(400, 'Cannot delete — beams are linked', 'BEAM_QUALITY_IN_USE');
+
+// In production-qualities DELETE handler
+const count = await prisma.productionInfo.count({ where: { productionQualityId: id, deletedAt: null } });
+if (count > 0) throw new AppError(400, 'Cannot delete — production records are linked', 'PRODUCTION_QUALITY_IN_USE');
+```
+
+### Rule 8 — User registration flow
+
+### Rule 9 — Always embed related objects; never return bare FK ids
+
+Every GET, POST, and PUT response must embed the full related object wherever a FK exists —
+the frontend must never need a second API call to resolve an id.
+
+**Standard include selects by relation type:**
+
+```typescript
+firm:             { select: { id: true, firmName: true, firmCode: true } }
+mill:             { select: { id: true, millName: true, millCode: true } }
+machine:          { select: { id: true, machineNo: true, machineType: true } }
+beam:             { select: { id: true, beamNo: true, beamMeter: true,
+                    beamQuality: { select: { id: true, name: true } } } }
+beamQuality:      { select: { id: true, name: true } }
+productionQuality:{ select: { id: true, name: true } }
+taka:             { select: { id: true, takaSrNo: true, takaMeter: true } }
+millOutvert:      { select: { id: true, firmChallanNo: true, outvertDate: true } }
+millInvert:       { select: { id: true, millChallanNo: true, invertDate: true } }
+```
+
+**Service pattern** — define a top-level include const, derive the return type from it,
+then `findUniqueOrThrow` at the end of every transaction:
+
+```typescript
+const productionInclude = {
+  firm: { select: { id: true, firmName: true, firmCode: true } },
+  machine: { select: { id: true, machineNo: true, machineType: true } },
+  beam: {
+    select: {
+      id: true, beamNo: true, beamMeter: true,
+      beamQuality: { select: { id: true, name: true } },
+    },
+  },
+  taka: { select: { id: true, takaSrNo: true, takaMeter: true } },
+  productionQuality: { select: { id: true, name: true } },
+} as const;
+
+type ProductionWithRelations = Prisma.ProductionInfoGetPayload<{
+  include: typeof productionInclude;
+}>;
+
+// At the end of every transaction — never return the plain model:
+return tx.productionInfo.findUniqueOrThrow({
+  where: { id: production.id },
+  include: productionInclude,
+});
+```
+
+**machineInfo view** — the data map returns `machine` (with nested `firm`) and `beam` as objects,
+not flat fields like `machineNo`, `firmId`, `beamNo`, `beamId`.
 
 New users who self-register via `POST /auth/register` are created with `role: "admin"`, `status: "pending"` and
 cannot log in until a super_admin approves them. Two exceptions auto-approve immediately:
@@ -709,11 +854,11 @@ const where = {
   ...(search && {
     OR: [
       { beamNo: { contains: search, mode: "insensitive" as const } },
-      { beamQuality: { contains: search, mode: "insensitive" as const } },
+      { beamQuality: { name: { contains: search, mode: "insensitive" as const } } },
     ],
   }),
   // Additional filters from query params:
-  ...(quality && { beamQuality: quality }),
+  ...(qualityId && { beamQualityId: qualityId }),   // filter by quality FK
   ...(meterMin && { beamMeter: { gte: new Prisma.Decimal(meterMin) } }),
   ...(meterMax && { beamMeter: { lte: new Prisma.Decimal(meterMax) } }),
 };
@@ -829,6 +974,12 @@ All successful responses follow this structure:
 { success: false, message: 'Human readable message', code: 'ERROR_CODE' }
 ```
 
+**Related objects are always embedded** (see Rule 9). Every response that would otherwise
+contain a raw FK id (e.g. `firmId`, `machineId`, `beamId`) instead contains the full
+related object under the relation name (e.g. `firm`, `machine`, `beam`). The raw FK field
+is still present on the record — but the related object is always alongside it so the
+frontend never needs a second call.
+
 ---
 
 ## 14. Key Packages
@@ -874,6 +1025,25 @@ All successful responses follow this structure:
 ```
 
 ---
+
+## 15. What NOT to Do
+
+- Do NOT use `any` type anywhere in TypeScript
+- Do NOT use `prisma.model.delete()` — always soft delete
+- Do NOT use `req.user.firmId` for DB query scoping — users have no firmId; `firmId` is only an optional query-param filter
+- Do NOT write mill sync logic inside route handlers — put it in service files
+- Do NOT create/update `ProductionInfo` and `Taka` in separate DB calls — always use `prisma.$transaction`
+- Do NOT return `passwordHash` in any response — exclude it explicitly
+- Do NOT skip `deletedAt: null` in any findMany/findFirst query
+- Do NOT use `console.log` for errors — use `console.error` in dev; replace with a logger in prod
+- Do NOT mutate `req.body` directly — destructure it first into typed variables
+- Do NOT hardcode super admin emails anywhere — always use `getSuperAdminEmails()` from `src/lib/superAdmin.ts`
+- Do NOT `await` email sends on the critical response path — fire-and-forget with `.catch((err) => console.error(...))`
+- Do NOT skip `requirePermission` on any protected route — every non-public route must declare its module and action
+- Do NOT perform permission checks inside route handlers — always use the `requirePermission` middleware
+- Do NOT return bare FK ids without the related object — every GET/POST/PUT response must embed the full related object (see Rule 9); use `include` on every `create`, `update`, and `findMany`/`findFirst`/`findUniqueOrThrow` call
+- Do NOT return the plain Prisma model from service functions — services must always `findUniqueOrThrow` at the end of each transaction with the module's `*Include` const so the enriched type is returned
+- Do NOT use `beamQuality: true` (full include with all fields) when embedding quality objects — always use `{ select: { id: true, name: true } }` to avoid leaking `deletedAt` and audit timestamps
 
 ---
 
@@ -1042,18 +1212,71 @@ npm run lint:fix    # auto-fix where possible
 
 ---
 
-## 15. What NOT to Do
+## 19. Testing
 
-- Do NOT use `any` type anywhere in TypeScript
-- Do NOT use `prisma.model.delete()` — always soft delete
-- Do NOT use `req.user.firmId` for DB query scoping — users have no firmId; `firmId` is only an optional query-param filter
-- Do NOT write mill sync logic inside route handlers — put it in service files
-- Do NOT create/update `ProductionInfo` and `Taka` in separate DB calls — always use `prisma.$transaction`
-- Do NOT return `passwordHash` in any response — exclude it explicitly
-- Do NOT skip `deletedAt: null` in any findMany/findFirst query
-- Do NOT use `console.log` for errors — use `console.error` in dev; replace with a logger in prod
-- Do NOT mutate `req.body` directly — destructure it first into typed variables
-- Do NOT hardcode super admin emails anywhere — always use `getSuperAdminEmails()` from `src/lib/superAdmin.ts`
-- Do NOT `await` email sends on the critical response path — fire-and-forget with `.catch((err) => console.error(...))`
-- Do NOT skip `requirePermission` on any protected route — every non-public route must declare its module and action
-- Do NOT perform permission checks inside route handlers — always use the `requirePermission` middleware
+### Stack
+
+| Tool        | Role                                                              |
+| ----------- | ----------------------------------------------------------------- |
+| Jest v30    | Test runner                                                       |
+| ts-jest     | Compiles TypeScript tests — uses `tsconfig.test.json`             |
+| Supertest   | HTTP integration testing — mounts `app` directly, no live server  |
+
+### Config files
+
+- `jest.config.ts` — preset: `ts-jest`, testMatch: `src/tests/**/*.test.ts`, setupFiles: `src/tests/setup.ts`
+- `tsconfig.test.json` — extends `tsconfig.json`, overrides `module: CommonJS` + `moduleResolution: node10` (Jest requires CJS; `ignoreDeprecations: "6.0"` silences the TS deprecation warning)
+- `src/tests/tsconfig.json` — thin file that extends `tsconfig.test.json` and adds `types: ["jest", "node"]`
+
+### Test environment setup (`src/tests/setup.ts`)
+
+Seeds all required `process.env` values before any test file runs — no `.env` file is read during tests.
+`DATABASE_URL` is set to a dummy value because Prisma is always mocked; no real DB connection is made.
+
+### Mocking strategy
+
+All tests use **unit-style mocking** — no real database or network calls.
+
+```typescript
+// Mock prisma at the top of every test file (hoisted by Jest)
+jest.mock("../lib/prisma", () => ({
+  prisma: {
+    user: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), ... },
+    $transaction: jest.fn(),
+  },
+}));
+
+// Mock mailer — fire-and-forget emails must not run in tests
+jest.mock("../lib/mailer", () => ({
+  sendApprovalRequestEmail: jest.fn(),
+  sendAccountApprovedEmail: jest.fn(),
+  sendPasswordResetEmail: jest.fn(),
+}));
+```
+
+### Running tests
+
+```bash
+npm test              # run all tests
+npm test -- --watch   # watch mode
+npm test -- auth      # run a single file by name fragment
+```
+
+### Test coverage — one file per route module
+
+| Test file              | Route covered            |
+| ---------------------- | ------------------------ |
+| `auth.test.ts`         | `/api/v1/auth/*`         |
+| `firms.test.ts`        | `/api/v1/firms`          |
+| `mills.test.ts`        | `/api/v1/mills`          |
+| `beamQualities.test.ts`       | `/api/v1/beam-qualities`       |
+| `productionQualities.test.ts` | `/api/v1/production-qualities` |
+| `machines.test.ts`     | `/api/v1/machines`       |
+| `beams.test.ts`        | `/api/v1/beams`          |
+| `production.test.ts`   | `/api/v1/production`     |
+| `takas.test.ts`        | `/api/v1/takas`          |
+| `millOutverts.test.ts` | `/api/v1/mill-outverts`  |
+| `millInverts.test.ts`  | `/api/v1/mill-inverts`   |
+| `machineInfo.test.ts`  | `/api/v1/machine-info`   |
+| `millSummary.test.ts`  | `/api/v1/mill-summary`   |
+| `permissions.test.ts`  | `/api/v1/permissions`    |

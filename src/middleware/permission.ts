@@ -3,6 +3,8 @@ import { prisma } from "../lib/prisma";
 import { AppError } from "../lib/errors";
 
 type Module =
+  | "beam_qualities"
+  | "production_qualities"
   | "machines"
   | "beams"
   | "production"

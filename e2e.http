@@ -1,0 +1,297 @@
+# E2E test suite — VS Code REST Client
+# Run each request in order. Requests named with @name capture their response for later steps.
+# Open this file with the REST Client extension and send each block with "Send Request".
+
+@baseUrl = http://localhost:4000/api/v1
+
+# ─── Step 1: Register super admin ───────────────────────────────────────────
+# First-time setup — auto-approved as super_admin because no super_admin exists yet.
+# Expected: 201 { success: true, message: "Account created." }
+
+### Step 1 — Register super admin
+# @name registerSuperAdmin
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Super Admin",
+  "email": "superadmin@textile.test",
+  "password": "SuperPass123!"
+}
+
+# ─── Step 2: Login as super admin ───────────────────────────────────────────
+# Expected: 200 { success: true, data: { accessToken, user: { role: "super_admin" } } }
+
+### Step 2 — Login as super admin → save token
+# @name loginSuperAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "superadmin@textile.test",
+  "password": "SuperPass123!"
+}
+
+# ─── Step 3: Create a firm (challanEnable: true) ────────────────────────────
+# Expected: 201 { success: true, data: { id, firmName, challanEnable: true } }
+
+### Step 3 — Create a firm with challanEnable true
+# @name createFirm
+POST {{baseUrl}}/firms
+Content-Type: application/json
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+{
+  "firmName": "E2E Test Firm",
+  "firmCode": "E2E001",
+  "challanEnable": true,
+  "address": "123 Test Street",
+  "contactPerson": "Test Person",
+  "contactNumber": "9999999999"
+}
+
+# ─── Step 4: Create a mill ──────────────────────────────────────────────────
+# Expected: 201 { success: true, data: { id, millName: "E2E Test Mill" } }
+
+### Step 4 — Create a mill
+# @name createMill
+POST {{baseUrl}}/mills
+Content-Type: application/json
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+{
+  "millName": "E2E Test Mill",
+  "millCode": "M001",
+  "address": "456 Mill Road",
+  "contactPerson": "Mill Manager",
+  "contactNumber": "8888888888"
+}
+
+# ─── Step 5: Create a machine ───────────────────────────────────────────────
+# Expected: 201 { success: true, data: { id, machineNo: "M-101", firmId } }
+
+### Step 5 — Create a machine (firmId from step 3)
+# @name createMachine
+POST {{baseUrl}}/machines
+Content-Type: application/json
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+{
+  "firmId": "{{createFirm.response.body.$.data.id}}",
+  "machineNo": "M-101",
+  "machineType": "Rapier",
+  "status": "active"
+}
+
+# ─── Step 6: Create a beam ──────────────────────────────────────────────────
+# Expected: 201 { success: true, data: { id, beamNo: "B-001", firmId } }
+
+### Step 6 — Create a beam (firmId from step 3)
+# @name createBeam
+POST {{baseUrl}}/beams
+Content-Type: application/json
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+{
+  "firmId": "{{createFirm.response.body.$.data.id}}",
+  "beamNo": "B-001",
+  "tar": 200,
+  "beamQuality": "Premium",
+  "takaQty": 50,
+  "beamMeter": 1200.00
+}
+
+# ─── Step 7: Register a regular admin ───────────────────────────────────────
+# Expected: 201 { success: true, message: "Registration submitted. Awaiting super admin approval." }
+
+### Step 7 — Register a regular admin (status: pending)
+# @name registerRegularAdmin
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Regular Admin",
+  "email": "admin@textile.test",
+  "password": "AdminPass123!"
+}
+
+# ─── Step 8: Approve the regular admin ──────────────────────────────────────
+# First fetch pending users to capture the admin's ID, then approve.
+# Expected for getPendingUsers: 200 { data: [{ id, name, email, status: "pending" }] }
+# Expected for approveAdmin: 200 { success: true, message: "User approved..." }
+
+### Step 8a — List pending users (capture admin ID)
+# @name getPendingUsers
+GET {{baseUrl}}/auth/pending-users
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+### Step 8b — Approve the regular admin
+# @name approveAdmin
+POST {{baseUrl}}/auth/approve-user/{{getPendingUsers.response.body.$.data[0].id}}
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+# ─── Step 9: Set permissions for the regular admin ──────────────────────────
+# beams: canView + canCreate only (no canDelete — tested in step 12)
+# production: canView + canCreate + canEdit
+# Expected: 200 { success: true, data: [...permissions] }
+
+### Step 9 — Set module permissions for the regular admin
+PUT {{baseUrl}}/permissions/{{getPendingUsers.response.body.$.data[0].id}}
+Content-Type: application/json
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+[
+  { "module": "beams",      "canView": true,  "canCreate": true,  "canEdit": false, "canDelete": false },
+  { "module": "production", "canView": true,  "canCreate": true,  "canEdit": true,  "canDelete": false }
+]
+
+# ─── Step 10: Login as regular admin ────────────────────────────────────────
+# Expected: 200 { success: true, data: { accessToken, user: { role: "admin" } } }
+
+### Step 10 — Login as regular admin → save token
+# @name loginRegularAdmin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@textile.test",
+  "password": "AdminPass123!"
+}
+
+# ─── Step 11: Create a beam as regular admin ─────────────────────────────────
+# Regular admin has beams:canCreate → should succeed.
+# Expected: 201 { success: true, data: { id, beamNo: "B-002" } }
+
+### Step 11 — Create a beam as regular admin (canCreate = true → 201)
+# @name createBeamAsAdmin
+POST {{baseUrl}}/beams
+Content-Type: application/json
+Authorization: Bearer {{loginRegularAdmin.response.body.$.data.accessToken}}
+
+{
+  "firmId": "{{createFirm.response.body.$.data.id}}",
+  "beamNo": "B-002",
+  "tar": 150,
+  "beamQuality": "Standard",
+  "takaQty": 30,
+  "beamMeter": 900.00
+}
+
+# ─── Step 12: Delete beam as regular admin ───────────────────────────────────
+# Regular admin has no beams:canDelete → should fail 403.
+# Expected: 403 { success: false, message: "Forbidden", code: "FORBIDDEN" }
+
+### Step 12 — Delete beam as regular admin (canDelete = false → expect 403)
+DELETE {{baseUrl}}/beams/{{createBeamAsAdmin.response.body.$.data.id}}
+Authorization: Bearer {{loginRegularAdmin.response.body.$.data.accessToken}}
+
+# ─── Step 13: Create a production entry ─────────────────────────────────────
+# Firm has challanEnable:true so productionChallanNo is accepted.
+# Taka is auto-created in the same transaction (Rule 1).
+# Expected: 201 { success: true, data: { id, takaSrNo: "T-001", productionChallanNo: "PC-001" } }
+
+### Step 13 — Create a production entry (challan included, taka auto-created)
+# @name createProduction
+POST {{baseUrl}}/production
+Content-Type: application/json
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+{
+  "firmId":             "{{createFirm.response.body.$.data.id}}",
+  "machineId":          "{{createMachine.response.body.$.data.id}}",
+  "beamId":             "{{createBeam.response.body.$.data.id}}",
+  "entryDate":          "2024-01-15T10:00:00.000Z",
+  "takaSrNo":           "T-001",
+  "takaMeter":          25.50,
+  "productionQuality":  "Premium",
+  "weight":             12.75,
+  "productionChallanNo": "PC-001"
+}
+
+# ─── Step 14: GET takas ──────────────────────────────────────────────────────
+# Verify the taka with takaSrNo "T-001" was auto-created alongside the production record.
+# Expected: 200 { data: [{ takaSrNo: "T-001", takaMeter: 25.5, ... }], pagination: { total: 1 } }
+
+### Step 14 — GET takas → verify T-001 was auto-created
+GET {{baseUrl}}/takas?firmId={{createFirm.response.body.$.data.id}}&search=T-001
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+# ─── Step 15: GET machine-info ───────────────────────────────────────────────
+# Verify machine M-101 shows its latest production entry (T-001).
+# Expected: 200 { data: [{ machineNo: "M-101", latestEntry: { takaSrNo: "T-001", ... } }] }
+
+### Step 15 — GET machine-info → verify M-101 shows latest production state
+# Response is flat: { machineNo, takaSrNo, beamNo, takaMeter, entryDate, ... }
+# Filter uses ?search= (not machine_no)
+GET {{baseUrl}}/machine-info?firmId={{createFirm.response.body.$.data.id}}&search=M-101
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+# ─── Step 16: Create a mill outvert ─────────────────────────────────────────
+# Syncs millOutvertId, millOutvertDate, and millName into ProductionInfo (Rule 3).
+# Expected: 201 { success: true, data: { id, firmChallanNo: "FC-001", outvertTakas: [{ takaSrNo: "T-001" }] } }
+
+### Step 16 — Create a mill outvert (taka T-001 sent to mill)
+# @name createMillOutvert
+POST {{baseUrl}}/mill-outverts
+Content-Type: application/json
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+{
+  "firmId":       "{{createFirm.response.body.$.data.id}}",
+  "millId":       "{{createMill.response.body.$.data.id}}",
+  "outvertDate":  "2024-01-20T08:00:00.000Z",
+  "firmChallanNo": "FC-001",
+  "takaSrNos":    ["T-001"]
+}
+
+# ─── Step 17: GET production/:id after outvert ───────────────────────────────
+# Verify millOutvertDate and millName are now filled in the production record.
+# Expected: 200 { data: { millOutvertDate: "2024-01-20T...", millName: "E2E Test Mill", millOutvertId: "..." } }
+
+### Step 17 — GET production/:id → verify millOutvertDate + millName filled
+GET {{baseUrl}}/production/{{createProduction.response.body.$.data.id}}
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+# ─── Step 18: Create a mill invert ──────────────────────────────────────────
+# Syncs millInvertId, millChallanNo, and millName into ProductionInfo (Rule 4).
+# firmChallanNo here references the outvert's firmChallanNo ("FC-001").
+# Expected: 201 { success: true, data: { id, millChallanNo: "MC-001", invertTakas: [{ takaSrNo: "T-001" }] } }
+
+### Step 18 — Create a mill invert (taka T-001 returned from mill)
+# @name createMillInvert
+POST {{baseUrl}}/mill-inverts
+Content-Type: application/json
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+{
+  "firmId":        "{{createFirm.response.body.$.data.id}}",
+  "millId":        "{{createMill.response.body.$.data.id}}",
+  "millOutvertId": "{{createMillOutvert.response.body.$.data.id}}",
+  "invertDate":    "2024-02-01T09:00:00.000Z",
+  "millChallanNo": "MC-001",
+  "firmChallanNo": "FC-001",
+  "takaSrNos":     ["T-001"]
+}
+
+# ─── Step 19: GET production/:id after invert ────────────────────────────────
+# Verify millChallanNo "MC-001" is now filled in the production record.
+# Expected: 200 { data: { millChallanNo: "MC-001", millInvertId: "...", millName: "E2E Test Mill" } }
+
+### Step 19 — GET production/:id → verify millChallanNo filled after invert
+GET {{baseUrl}}/production/{{createProduction.response.body.$.data.id}}
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+# ─── Step 20: GET mill-summary?status=returned ──────────────────────────────
+# Taka T-001 has both outvert and invert → status "returned".
+# Expected: 200 { data: [{ takaSrNo: "T-001", millInvertId: "...", ... }], pagination: { total >= 1 } }
+
+### Step 20 — GET mill-summary?status=returned → verify T-001 appears as returned
+GET {{baseUrl}}/mill-summary?status=returned&firmId={{createFirm.response.body.$.data.id}}&search=T-001
+Authorization: Bearer {{loginSuperAdmin.response.body.$.data.accessToken}}
+
+# ─── Step 21: GET /api/v1/api-docs.json ─────────────────────────────────────
+# Verify the OpenAPI spec endpoint returns a valid JSON object with openapi + paths keys.
+# Expected: 200 { openapi: "3.0.0", info: { title: "Textile API" }, paths: { ... } }
+
+### Step 21 — GET api-docs.json → verify valid OpenAPI spec returned
+GET {{baseUrl}}/api-docs.json

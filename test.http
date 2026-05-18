@@ -1,0 +1,836 @@
+### 1. Register with super admin email (auto-approved as super_admin)
+POST http://localhost:4000/api/v1/auth/register
+Content-Type: application/json
+
+{ "name": "Super Admin", "email": "solankinisarg815@example.com", "password": "Admin@1234" }
+
+###
+
+### 2. Duplicate super admin email registration
+POST http://localhost:4000/api/v1/auth/register
+Content-Type: application/json
+
+{ "name": "Super Admin", "email": "solankinisarg815@example.com", "password": "Admin@1234" }
+
+###
+
+### 3. Register a regular admin (pending)
+POST http://localhost:4000/api/v1/auth/register
+Content-Type: application/json
+
+{ "name": "Test Admin", "email": "testadmin@example.com", "password": "Test@1234" }
+
+###
+
+### 4. Try login as pending user
+POST http://localhost:4000/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "testadmin@example.com", "password": "Test@1234" }
+
+###
+
+### 5. Login as super admin — save token
+POST http://localhost:4000/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "solankinisarg815@example.com", "password": "Admin@1234" }
+
+###
+
+### 6. Get pending users (replace SUPER_ADMIN_TOKEN with token from step 5)
+GET http://localhost:4000/api/v1/auth/pending-users
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 7. Approve pending user (replace SUPER_ADMIN_TOKEN and USER_ID)
+POST http://localhost:4000/api/v1/auth/approve-user/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 8. Login as approved admin — save token
+POST http://localhost:4000/api/v1/auth/login
+Content-Type: application/json
+
+{ "email": "testadmin@example.com", "password": "Test@1234" }
+
+###
+
+### 9. Try to access beams with no permissions (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 10. Set permissions for the admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "beams", "canView": true, "canCreate": true, "canEdit": true, "canDelete": false }]
+
+###
+
+### 11. Get permissions for the admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+GET http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 12. Try beams again after permission grant (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 13. Try to delete a beam — no delete permission (replace ADMIN_TOKEN)
+DELETE http://localhost:4000/api/v1/beams/nonexistent-id
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 14. Forgot password
+POST http://localhost:4000/api/v1/auth/forgot-password
+Content-Type: application/json
+
+{ "email": "testadmin@example.com" }
+
+###
+
+### 15. Refresh token (uses httpOnly cookie set during login)
+POST http://localhost:4000/api/v1/auth/refresh
+
+###
+
+### 16. Logout
+POST http://localhost:4000/api/v1/auth/logout
+
+###
+
+### 17. Create firm (replace SUPER_ADMIN_TOKEN)
+POST http://localhost:4000/api/v1/firms
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmName": "Sunrise Textiles", "firmCode": "SRT01", "challanEnable": false, "address": "Surat, Gujarat", "contactPerson": "Rajesh Shah", "contactNumber": "9876543210" }
+
+###
+
+### 18. List all firms — verify created firm appears (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/firms
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 18b. Search firms by name (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/firms?search=Sunrise
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 19. Get single firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/firms/FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 20. Update firm — enable challan (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+PUT http://localhost:4000/api/v1/firms/FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "challanEnable": true }
+
+###
+
+### 21. Delete firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+DELETE http://localhost:4000/api/v1/firms/FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 22. Create mill (replace SUPER_ADMIN_TOKEN)
+POST http://localhost:4000/api/v1/mills
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "millName": "Sunrise Mill", "millCode": "SRM01", "address": "Surat, Gujarat", "contactPerson": "Ravi Patel", "contactNumber": "9876543210" }
+
+###
+
+### 23. List all mills — test ?search= (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mills?search=Sunrise
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 24. Get single mill (replace SUPER_ADMIN_TOKEN and MILL_ID)
+GET http://localhost:4000/api/v1/mills/MILL_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 25. Update mill name (replace SUPER_ADMIN_TOKEN and MILL_ID)
+PUT http://localhost:4000/api/v1/mills/MILL_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "millName": "Sunrise Mill Updated" }
+
+###
+
+### 26. Delete mill (replace SUPER_ADMIN_TOKEN and MILL_ID)
+DELETE http://localhost:4000/api/v1/mills/MILL_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MACHINES MODULE ---
+
+### 27. Grant machines permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[
+  { "module": "machines", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }
+]
+
+###
+
+### 28. POST /api/v1/machines — create machine (replace ADMIN_TOKEN and FIRM_ID from step 17/18)
+POST http://localhost:4000/api/v1/machines
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "machineNo": "M-001", "machineType": "Rapier", "status": "active", "remark": "Main loom" }
+
+###
+
+### 29. POST /api/v1/machines — create second machine to delete later (replace ADMIN_TOKEN and FIRM_ID)
+POST http://localhost:4000/api/v1/machines
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "machineNo": "M-002", "machineType": "Airjet", "status": "active" }
+
+###
+
+### 30. GET /api/v1/machines — list all (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/machines
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 31. GET /api/v1/machines?firmId= — filter by firm (replace ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/machines?firmId=FIRM_ID
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 32. GET /api/v1/machines?search=Rapier — search (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/machines?search=Rapier
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 33. GET /api/v1/machines/:id — get single (replace ADMIN_TOKEN and MACHINE_ID)
+GET http://localhost:4000/api/v1/machines/MACHINE_ID
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 34. PUT /api/v1/machines/:id — update status to inactive (replace ADMIN_TOKEN and MACHINE_ID)
+PUT http://localhost:4000/api/v1/machines/MACHINE_ID
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "status": "inactive" }
+
+###
+
+### 35. DELETE /api/v1/machines/:id — delete second machine (replace ADMIN_TOKEN and MACHINE_ID_2)
+DELETE http://localhost:4000/api/v1/machines/MACHINE_ID_2
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 36. GET /api/v1/machines — no 'machines' permission (use token with no machines permission — e.g. a fresh admin token)
+GET http://localhost:4000/api/v1/machines
+Authorization: Bearer ADMIN_TOKEN_NO_PERMISSION
+
+###
+
+### --- BEAMS MODULE ---
+
+### 37. Grant beams permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[
+  { "module": "beams", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }
+]
+
+###
+
+### 38. POST /api/v1/beams — create beam (replace ADMIN_TOKEN and FIRM_ID from step 17/18)
+POST http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "beamNo": "B-001", "tar": 120, "beamQuality": "High", "takaQty": 50, "beamMeter": 250.50 }
+
+###
+
+### 39. POST /api/v1/beams — create second beam (to delete later, no production records)
+POST http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "beamNo": "B-002", "tar": 80, "beamQuality": "Medium", "takaQty": 30, "beamMeter": 180.00 }
+
+###
+
+### 40. POST /api/v1/beams — duplicate beamNo — expect 409 BEAM_NO_DUPLICATE
+POST http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "firmId": "FIRM_ID", "beamNo": "B-001", "tar": 100, "beamQuality": "Low", "takaQty": 20, "beamMeter": 100.00 }
+
+###
+
+### 41. GET /api/v1/beams — list all (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 42. GET /api/v1/beams?firmId=FIRM_ID — filter by firm (replace ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/beams?firmId=FIRM_ID
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 43. GET /api/v1/beams?search=High — search by quality (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams?search=High
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 44. GET /api/v1/beams?quality=High — filter by quality (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams?quality=High
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 45. GET /api/v1/beams?meter_min=200 — filter by minimum meter (replace ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/beams?meter_min=200
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 46. GET /api/v1/beams/:id — get single beam (replace ADMIN_TOKEN and BEAM_ID)
+GET http://localhost:4000/api/v1/beams/BEAM_ID
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 47. PUT /api/v1/beams/:id — update beamMeter (replace ADMIN_TOKEN and BEAM_ID)
+PUT http://localhost:4000/api/v1/beams/BEAM_ID
+Authorization: Bearer ADMIN_TOKEN
+Content-Type: application/json
+
+{ "beamMeter": 300.75 }
+
+###
+
+### 48. DELETE /api/v1/beams/:id — delete beam with no production records (replace ADMIN_TOKEN and BEAM_ID_2)
+DELETE http://localhost:4000/api/v1/beams/BEAM_ID_2
+Authorization: Bearer ADMIN_TOKEN
+
+###
+
+### 49. GET /api/v1/beams — no 'beams' permission — expect 403 (replace ADMIN_TOKEN_NO_PERMISSION)
+GET http://localhost:4000/api/v1/beams
+Authorization: Bearer ADMIN_TOKEN_NO_PERMISSION
+
+###
+
+### --- PRODUCTION MODULE ---
+### Prerequisites: FIRM_ID must have challanEnable=true (run step 20 first)
+###                MACHINE_ID from step 28, BEAM_ID from step 38
+
+### 50. Grant production permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "production", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }]
+
+###
+
+### 51. POST /api/v1/production — create entry with challan (replace tokens and IDs)
+POST http://localhost:4000/api/v1/production
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "machineId": "MACHINE_ID",
+  "beamId": "BEAM_ID",
+  "entryDate": "2026-04-29T08:00:00.000Z",
+  "takaSrNo": "T-001",
+  "takaMeter": 125.50,
+  "productionQuality": "High",
+  "weight": 12.75,
+  "remark": "First entry",
+  "productionChallanNo": "CH-001"
+}
+
+###
+
+### 52. POST — duplicate takaSrNo — expect 409 TAKA_SR_NO_DUPLICATE
+POST http://localhost:4000/api/v1/production
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "machineId": "MACHINE_ID",
+  "beamId": "BEAM_ID",
+  "entryDate": "2026-04-29T09:00:00.000Z",
+  "takaSrNo": "T-001",
+  "takaMeter": 100.00,
+  "productionQuality": "Medium",
+  "weight": 10.00
+}
+
+###
+
+### 53. GET /api/v1/production — list all (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/production
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 54. GET ?firmId= filter (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/production?firmId=FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 55. GET ?search=T-001 — search by takaSrNo (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/production?search=T-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 56. GET ?date_from=2026-04-01 — date range filter (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/production?date_from=2026-04-01
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 57. GET ?date_from=2026-05-01 — future date, expect empty result (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/production?date_from=2026-05-01
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 58. GET /api/v1/production/:id — verify taka auto-created and linked (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 59. PUT /api/v1/production/:id — update remark (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
+PUT http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "remark": "Updated remark after review" }
+
+###
+
+### 60. PUT with forbidden mill fields — verify millName, millChallanNo, millOutvertId are stripped
+### Response must show millName: null (not "INJECTED MILL") — confirm via GET step 58 after
+PUT http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "remark": "With forbidden fields attempt",
+  "millName": "INJECTED MILL",
+  "millChallanNo": "INJECTED-99",
+  "millOutvertId": "fake-id",
+  "millInvertId": "fake-id",
+  "millOutvertDate": "2026-01-01T00:00:00.000Z"
+}
+
+###
+
+### 61. DELETE /api/v1/production/:id — soft delete record and linked taka (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
+### Create a second record first (step 51 with takaSrNo: T-002) to delete, so T-001 stays for mill tests
+DELETE http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 62. GET after delete — expect 404 PRODUCTION_NOT_FOUND (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- TAKAS MODULE (read-only, auto-generated from production) ---
+### Prerequisites: production record + taka created in step 51 (T-001 / PRODUCTION_ID)
+
+### 63. Grant takas permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "takas", "canView": true, "canCreate": false, "canEdit": false, "canDelete": false }]
+
+###
+
+### 64. GET /api/v1/takas — list all takas; taka auto-created from step 51 should appear (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 65. GET /api/v1/takas?firmId=FIRM_ID — filter by firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/takas?firmId=FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 66. GET /api/v1/takas?search=T-001 — search by takaSrNo (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas?search=T-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 67. GET /api/v1/takas?beam_no=B-001 — filter by beam number (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas?beam_no=B-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 68. GET /api/v1/takas?meter_min=100 — filter by min meter (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas?meter_min=100
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 69. GET /api/v1/takas/:id — verify productionInfo linked with machine + firm (replace SUPER_ADMIN_TOKEN and TAKA_ID)
+GET http://localhost:4000/api/v1/takas/TAKA_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 70. GET /api/v1/takas/nonexistent — expect 404 TAKA_NOT_FOUND (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/takas/00000000-0000-0000-0000-000000000000
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MILL OUTVERTS MODULE ---
+### Prerequisites: FIRM_ID, MILL_ID (from step 22), SUPER_ADMIN_TOKEN
+###                T-001 production entry must exist (step 51) — do NOT run step 61 (delete) before these tests
+
+### 71. Grant mill_outverts permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "mill_outverts", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }]
+
+###
+
+### 72. POST /api/v1/mill-outverts — create outvert with T-001 (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID)
+### Expect 201; outvertTakas array with T-001
+POST http://localhost:4000/api/v1/mill-outverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "outvertDate": "2026-04-29T10:00:00.000Z",
+  "firmChallanNo": "OUT-001",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 73. GET /api/v1/production/:id — verify millOutvertDate and millName are now auto-filled
+### (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID from step 51)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 74. GET /api/v1/mill-outverts — list; newly created outvert should appear (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-outverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 75. GET /api/v1/mill-outverts?search=OUT-001 — search by firmChallanNo (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-outverts?search=OUT-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 76. GET /api/v1/mill-outverts/:id — verify outvertTakas and productionInfos included
+### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
+GET http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 77. POST duplicate firmChallanNo — expect 409 CHALLAN_DUPLICATE (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID)
+POST http://localhost:4000/api/v1/mill-outverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "outvertDate": "2026-04-29T11:00:00.000Z",
+  "firmChallanNo": "OUT-001",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 78. POST with nonexistent takaSrNo — expect 400 TAKA_NOT_FOUND (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID)
+POST http://localhost:4000/api/v1/mill-outverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "outvertDate": "2026-04-29T11:00:00.000Z",
+  "firmChallanNo": "OUT-002",
+  "takaSrNos": ["DOES-NOT-EXIST"]
+}
+
+###
+
+### 79. PUT /api/v1/mill-outverts/:id — update outvertDate only
+### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
+PUT http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "outvertDate": "2026-04-30T08:00:00.000Z" }
+
+###
+
+### 80. DELETE /api/v1/mill-outverts/:id — soft delete; expect ProductionInfo mill fields cleared
+### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
+DELETE http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 81. GET /api/v1/production/:id — verify millOutvertDate and millName are now null after delete
+### (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID from step 51)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 82. GET /api/v1/mill-outverts/:id after delete — expect 404 MILL_OUTVERT_NOT_FOUND
+### (replace SUPER_ADMIN_TOKEN and OUTVERT_ID from step 72)
+GET http://localhost:4000/api/v1/mill-outverts/OUTVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MILL INVERTS MODULE ---
+### Prerequisites: FIRM_ID, MILL_ID, SUPER_ADMIN_TOKEN
+###   Re-create the outvert first (step 72) so T-001 has millOutvertId set.
+###   OUTVERT_ID = id returned by step 72.
+
+### 83. Grant mill_inverts permission to admin (replace SUPER_ADMIN_TOKEN and USER_ID)
+PUT http://localhost:4000/api/v1/permissions/USER_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+[{ "module": "mill_inverts", "canView": true, "canCreate": true, "canEdit": true, "canDelete": true }]
+
+###
+
+### 84. POST /api/v1/mill-inverts — create invert referencing the outvert from step 72
+### Expect 201; invertTakas contains T-001; millChallanNo = INV-001
+### (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID, OUTVERT_ID)
+POST http://localhost:4000/api/v1/mill-inverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "millOutvertId": "OUTVERT_ID",
+  "invertDate": "2026-04-29T14:00:00.000Z",
+  "millChallanNo": "INV-001",
+  "firmChallanNo": "FINV-001",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 85. GET /api/v1/production/:id — verify millChallanNo and millName are now filled
+### (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID from step 51)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 86. GET /api/v1/mill-inverts — list; newly created invert should appear (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-inverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 87. GET /api/v1/mill-inverts?search=INV-001 — search by millChallanNo (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-inverts?search=INV-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 88. GET /api/v1/mill-inverts/:id — verify invertTakas, mill, millOutvert, and productionInfos included
+### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
+GET http://localhost:4000/api/v1/mill-inverts/INVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 89. POST duplicate millChallanNo — expect 409 MILL_CHALLAN_DUPLICATE
+### (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID, OUTVERT_ID)
+POST http://localhost:4000/api/v1/mill-inverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "millOutvertId": "OUTVERT_ID",
+  "invertDate": "2026-04-29T15:00:00.000Z",
+  "millChallanNo": "INV-001",
+  "firmChallanNo": "FINV-002",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 90. POST duplicate firmChallanNo — expect 409 FIRM_CHALLAN_DUPLICATE
+### (replace SUPER_ADMIN_TOKEN, FIRM_ID, MILL_ID, OUTVERT_ID)
+POST http://localhost:4000/api/v1/mill-inverts
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{
+  "firmId": "FIRM_ID",
+  "millId": "MILL_ID",
+  "millOutvertId": "OUTVERT_ID",
+  "invertDate": "2026-04-29T15:00:00.000Z",
+  "millChallanNo": "INV-002",
+  "firmChallanNo": "FINV-001",
+  "takaSrNos": ["T-001"]
+}
+
+###
+
+### 91. GET /api/v1/mill-summary — quick check that data flows through
+### (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 92. PUT /api/v1/mill-inverts/:id — update invertDate only
+### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
+PUT http://localhost:4000/api/v1/mill-inverts/INVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+Content-Type: application/json
+
+{ "invertDate": "2026-04-30T09:00:00.000Z" }
+
+###
+
+### 93. DELETE /api/v1/mill-inverts/:id — soft delete; expect ProductionInfo invert fields cleared
+### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
+DELETE http://localhost:4000/api/v1/mill-inverts/INVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 94. GET /api/v1/production/:id — verify millInvertId, millChallanNo, millName are now null
+### (replace SUPER_ADMIN_TOKEN and PRODUCTION_ID from step 51)
+GET http://localhost:4000/api/v1/production/PRODUCTION_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 95. GET /api/v1/mill-inverts/:id after delete — expect 404 MILL_INVERT_NOT_FOUND
+### (replace SUPER_ADMIN_TOKEN and INVERT_ID from step 84)
+GET http://localhost:4000/api/v1/mill-inverts/INVERT_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MACHINE INFO VIEW ---
+### Prerequisites: at least one production entry exists (step 51). Replace SUPER_ADMIN_TOKEN throughout.
+
+### 96. GET /api/v1/machine-info — latest production state per machine (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/machine-info
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 97. GET /api/v1/machine-info?firmId=FIRM_ID — filter by firm (replace SUPER_ADMIN_TOKEN and FIRM_ID)
+GET http://localhost:4000/api/v1/machine-info?firmId=FIRM_ID
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 98. GET /api/v1/machine-info?search=M-001 — search by machine number (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/machine-info?search=M-001
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### --- MILL SUMMARY VIEW ---
+### Prerequisites: outvert (step 72) and invert (step 84) must both exist. Replace SUPER_ADMIN_TOKEN throughout.
+
+### 99. GET /api/v1/mill-summary — all takas with mill tracking status (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 100. GET /api/v1/mill-summary?status=sent — sent to mill, not yet returned (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary?status=sent
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 101. GET /api/v1/mill-summary?status=returned — fully returned from mill (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary?status=returned
+Authorization: Bearer SUPER_ADMIN_TOKEN
+
+###
+
+### 102. GET /api/v1/mill-summary?status=pending — not yet sent to mill (replace SUPER_ADMIN_TOKEN)
+GET http://localhost:4000/api/v1/mill-summary?status=pending
+Authorization: Bearer SUPER_ADMIN_TOKEN

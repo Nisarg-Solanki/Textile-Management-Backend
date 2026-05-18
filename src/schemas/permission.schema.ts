@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 const permissionEntrySchema = z.object({
   module: z.enum([
+    'beam_qualities',
+    'production_qualities',
     'machines',
     'beams',
     'production',
