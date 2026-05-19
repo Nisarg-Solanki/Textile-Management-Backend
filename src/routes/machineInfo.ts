@@ -9,7 +9,7 @@ const router = Router();
  * @openapi
  * /api/v1/machine-info:
  *   get:
- *     summary: Latest production entry per machine (auto-generated view)
+ *     summary: All machines with nested beams and takas
  *     tags: [MachineInfo]
  *     security:
  *       - bearerAuth: []
@@ -30,7 +30,7 @@ const router = Router();
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Paginated list — one row per machine showing its latest production state
+ *         description: Paginated list of machines, each with their beams and takas
  *       403:
  *         description: Forbidden
  */
@@ -46,49 +46,67 @@ router.get(
       100,
       Math.max(1, parseInt((req.query.limit as string) ?? "20", 10)),
     );
+    const skip = (page - 1) * limit;
 
-    // Fetch the latest ProductionInfo per machine using distinct on machineId
-    const latestEntries = await prisma.productionInfo.findMany({
-      where: {
-        deletedAt: null,
-        ...(firmId && { firmId }),
-      },
-      orderBy: { createdAt: "desc" },
-      distinct: ["machineId"],
-      include: {
-        machine: {
-          select: {
-            id: true,
-            machineNo: true,
-            firm: { select: { id: true, firmName: true, firmCode: true } },
+    const where = {
+      deletedAt: null,
+      ...(firmId && { firmId }),
+      ...(search && {
+        machineNo: { contains: search, mode: "insensitive" as const },
+      }),
+    };
+
+    const [total, machines] = await Promise.all([
+      prisma.machine.count({ where }),
+      prisma.machine.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { machineNo: "asc" },
+        include: {
+          firm: { select: { id: true, firmName: true, firmCode: true } },
+          productionInfos: {
+            where: { deletedAt: null },
+            orderBy: { entryDate: "desc" },
+            include: {
+              beam: {
+                select: {
+                  id: true,
+                  beamNo: true,
+                  beamMeter: true,
+                },
+              },
+              taka: { select: { id: true, takaSrNo: true, takaMeter: true } },
+            },
           },
         },
-        beam: { select: { id: true, beamNo: true } },
-      },
+      }),
+    ]);
+
+    type ProdEntry = (typeof machines)[number]["productionInfos"][number];
+    type BeamEntry = ProdEntry["beam"] & {
+      takas: NonNullable<ProdEntry["taka"]>[];
+    };
+
+    const data = machines.map((machine) => {
+      const { productionInfos, ...machineFields } = machine;
+
+      const beamMap = new Map<string, BeamEntry>();
+
+      for (const prod of productionInfos) {
+        if (!beamMap.has(prod.beamId)) {
+          beamMap.set(prod.beamId, { ...prod.beam, takas: [] });
+        }
+        if (prod.taka) {
+          beamMap.get(prod.beamId)!.takas.push(prod.taka);
+        }
+      }
+
+      return {
+        ...machineFields,
+        beams: Array.from(beamMap.values()),
+      };
     });
-
-    // Apply search filter in-memory (machine.machineNo is a relation field)
-    const filtered = search
-      ? latestEntries.filter((entry) =>
-          entry.machine.machineNo
-            .toLowerCase()
-            .includes(search.toLowerCase()),
-        )
-      : latestEntries;
-
-    // Paginate the filtered result
-    const total = filtered.length;
-    const skip = (page - 1) * limit;
-    const paginated = filtered.slice(skip, skip + limit);
-
-    const data = paginated.map((entry) => ({
-      id: entry.id,
-      machine: entry.machine,
-      beam: entry.beam,
-      takaSrNo: entry.takaSrNo,
-      takaMeter: entry.takaMeter,
-      entryDate: entry.entryDate,
-    }));
 
     res.json({
       success: true,
