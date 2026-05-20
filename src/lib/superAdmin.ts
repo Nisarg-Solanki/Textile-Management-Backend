@@ -8,6 +8,6 @@ export function getSuperAdminEmails(): string[] {
 
 export function isSuperAdminEmail(email: string): boolean {
   return getSuperAdminEmails().some(
-    (e) => e.toLowerCase() === email.toLowerCase(),
+    (e) => e.toLowerCase() === email.toLowerCase()
   );
 }
