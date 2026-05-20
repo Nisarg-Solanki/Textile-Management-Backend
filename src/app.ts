@@ -23,6 +23,9 @@ import millSummaryRouter from "./routes/millSummary";
 
 const app = express();
 
+// Trust Render's reverse proxy so express-rate-limit reads the real client IP
+app.set("trust proxy", 1);
+
 // 1. helmet
 app.use(helmet());
 
