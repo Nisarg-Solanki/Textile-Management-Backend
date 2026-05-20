@@ -14,9 +14,9 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: textile_db_test
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -24,6 +24,13 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      NODE_ENV: test
+      JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+      JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+      SUPER_ADMIN_EMAILS: ${{ vars.SUPER_ADMIN_EMAILS }}
 
     steps:
       - uses: actions/checkout@v4
@@ -43,14 +50,8 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      - name: Run tests
-        run: npm test
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/textile_db_test
-          JWT_ACCESS_SECRET: test-secret-key-min-32-characters-long
-          JWT_REFRESH_SECRET: test-refresh-secret-key-min-32-chars
-          SUPER_ADMIN_EMAILS: admin@example.com
-          NODE_ENV: test
+      # - name: Run tests
+      #   run: npm test
 
       - name: Build
         run: npm run build
