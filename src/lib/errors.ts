@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { Prisma } from '@prisma/client';
 import { ZodError } from 'zod';
 
 export class AppError extends Error {
@@ -11,6 +10,17 @@ export class AppError extends Error {
     super(message);
     this.name = 'AppError';
   }
+}
+
+// Duck-type check: Prisma KnownRequestError always has code + clientVersion
+function isPrismaKnownError(err: unknown): err is { code: string; clientVersion: string } {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    'clientVersion' in err &&
+    typeof (err as Record<string, unknown>).code === 'string'
+  );
 }
 
 export function errorHandler(
@@ -28,7 +38,7 @@ export function errorHandler(
     return;
   }
 
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
+  if (isPrismaKnownError(err)) {
     if (err.code === 'P2002') {
       res.status(409).json({ success: false, message: 'A record with this value already exists.', code: 'CONFLICT' });
       return;
