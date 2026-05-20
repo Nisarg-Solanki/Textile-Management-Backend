@@ -42,7 +42,6 @@ router.get("/:adminId", authMiddleware, async (req: Request, res: Response) => {
     where: { id: adminId, role: "admin", deletedAt: null },
     select: { id: true, name: true, email: true },
   });
-  console.log("user permission:>> ", user);
   if (!user) throw new AppError(404, "Admin user not found", "USER_NOT_FOUND");
 
   const permissions = await prisma.adminPermission.findMany({
