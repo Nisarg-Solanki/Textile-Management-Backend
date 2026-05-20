@@ -54,12 +54,7 @@ router.get(
     const meterMin = req.query.meter_min as string | undefined;
     const meterMax = req.query.meter_max as string | undefined;
     const firmId = req.query.firmId as string | undefined;
-    const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
-    const limit = Math.min(
-      100,
-      Math.max(1, parseInt((req.query.limit as string) ?? "20", 10)),
-    );
-    const skip = (page - 1) * limit;
+    const getAll = req.query.getAll === "true";
 
     const where: Prisma.BeamWhereInput = {
       deletedAt: null,
@@ -75,6 +70,29 @@ router.get(
       }),
     };
 
+    const beamSelect = {
+      include: {
+        firm: { select: { id: true, firmName: true, firmCode: true } },
+        beamQuality: { select: { id: true, name: true } },
+      },
+    } as const;
+
+    if (getAll) {
+      const data = await prisma.beam.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        ...beamSelect,
+      });
+      return res.json({ success: true, data });
+    }
+
+    const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
+    const limit = Math.min(
+      100,
+      Math.max(1, parseInt((req.query.limit as string) ?? "20", 10)),
+    );
+    const skip = (page - 1) * limit;
+
     const [total, data] = await Promise.all([
       prisma.beam.count({ where }),
       prisma.beam.findMany({
@@ -82,10 +100,7 @@ router.get(
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
-        include: {
-          firm: { select: { id: true, firmName: true, firmCode: true } },
-          beamQuality: { select: { id: true, name: true } },
-        },
+        ...beamSelect,
       }),
     ]);
 
@@ -148,9 +163,8 @@ router.get(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [firmId, beamNo, tar, beamQualityId, takaQty, beamMeter]
+ *             required: [beamNo, tar, beamQualityId, takaQty, beamMeter]
  *             properties:
- *               firmId: { type: string, format: uuid }
  *               beamNo: { type: string }
  *               tar: { type: integer }
  *               beamQualityId: { type: string, format: uuid }
@@ -169,13 +183,8 @@ router.post(
   authMiddleware,
   requirePermission("beams", "create"),
   async (req: Request, res: Response) => {
-    const { firmId, beamNo, tar, beamQualityId, takaQty, beamMeter } =
+    const { beamNo, tar, beamQualityId, takaQty, beamMeter } =
       createBeamSchema.parse(req.body);
-
-    const firm = await prisma.firm.findFirst({
-      where: { id: firmId, deletedAt: null },
-    });
-    if (!firm) throw new AppError(404, "Firm not found", "FIRM_NOT_FOUND");
 
     const quality = await prisma.beamQuality.findFirst({
       where: { id: beamQualityId, deletedAt: null },
@@ -184,17 +193,17 @@ router.post(
       throw new AppError(404, "Beam quality not found", "BEAM_QUALITY_NOT_FOUND");
 
     const duplicate = await prisma.beam.findFirst({
-      where: { firmId, beamNo, deletedAt: null },
+      where: { beamNo, deletedAt: null },
     });
     if (duplicate)
       throw new AppError(
         409,
-        "Beam number already exists in this firm",
+        "Beam number already exists",
         "BEAM_NO_DUPLICATE",
       );
 
     const beam = await prisma.beam.create({
-      data: { firmId, beamNo, tar, beamQualityId, takaQty, beamMeter },
+      data: { beamNo, tar, beamQualityId, takaQty, beamMeter },
       include: {
         firm: { select: { id: true, firmName: true, firmCode: true } },
         beamQuality: { select: { id: true, name: true } },
@@ -238,14 +247,13 @@ router.put(
     if (!existing) throw new AppError(404, "Beam not found", "BEAM_NOT_FOUND");
 
     if (data.beamNo && data.beamNo !== existing.beamNo) {
-      const firmId = data.firmId ?? existing.firmId;
       const duplicate = await prisma.beam.findFirst({
-        where: { firmId, beamNo: data.beamNo, deletedAt: null, NOT: { id } },
+        where: { beamNo: data.beamNo, deletedAt: null, NOT: { id } },
       });
       if (duplicate)
         throw new AppError(
           409,
-          "Beam number already exists in this firm",
+          "Beam number already exists",
           "BEAM_NO_DUPLICATE",
         );
     }

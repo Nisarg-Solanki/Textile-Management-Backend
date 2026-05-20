@@ -6,16 +6,11 @@ import { setPermissionsSchema } from "../schemas/permission.schema";
 
 const router = Router();
 
-function assertSuperAdmin(req: Request): void {
-  if (req.user?.role !== "super_admin")
-    throw new AppError(403, "Super admin only", "FORBIDDEN");
-}
-
 /**
  * @openapi
  * /api/v1/permissions/{adminId}:
  *   get:
- *     summary: Get all module permissions for an admin (super_admin only)
+ *     summary: Get all module permissions for an admin (super_admin or self)
  *     tags: [Permissions]
  *     security:
  *       - bearerAuth: []
@@ -29,14 +24,17 @@ function assertSuperAdmin(req: Request): void {
  *       200:
  *         description: User info and their permissions
  *       403:
- *         description: Super admin only
+ *         description: Forbidden
  *       404:
  *         description: Admin user not found
  */
 router.get("/:adminId", authMiddleware, async (req: Request, res: Response) => {
-  assertSuperAdmin(req);
-
   const adminId = req.params.adminId as string;
+  const isSuperAdmin = req.user?.role === "super_admin";
+  const isSelf = req.user?.userId === adminId;
+
+  if (!isSuperAdmin && !isSelf)
+    throw new AppError(403, "Forbidden", "FORBIDDEN");
 
   const user = await prisma.user.findFirst({
     where: { id: adminId, role: "admin", deletedAt: null },
@@ -97,7 +95,8 @@ router.get("/:adminId", authMiddleware, async (req: Request, res: Response) => {
  *         description: Admin user not found
  */
 router.put("/:adminId", authMiddleware, async (req: Request, res: Response) => {
-  assertSuperAdmin(req);
+  if (req.user?.role !== "super_admin")
+    throw new AppError(403, "Super admin only", "FORBIDDEN");
 
   const adminId = req.params.adminId as string;
   const body = setPermissionsSchema.parse(req.body);

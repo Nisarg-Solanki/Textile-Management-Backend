@@ -93,6 +93,7 @@ router.get(
       }),
       ...(search && {
         OR: [
+          { takaNo: { contains: search, mode: "insensitive" as const } },
           { takaSrNo: { contains: search, mode: "insensitive" as const } },
           { productionQuality: { name: { contains: search, mode: "insensitive" as const } } },
           { remark: { contains: search, mode: "insensitive" as const } },

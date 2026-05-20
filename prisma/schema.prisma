@@ -92,7 +92,7 @@ model BeamQuality {
 
 model Beam {
   id              String    @id @default(uuid())
-  firmId          String
+  firmId          String?                              // auto-filled from production; not set at creation
   beamNo          String
   tar             Int
   beamQualityId   String                               // FK → BeamQuality.id
@@ -102,15 +102,14 @@ model Beam {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
-  firm            Firm             @relation(fields: [firmId], references: [id])
+  firm            Firm?            @relation(fields: [firmId], references: [id])
   beamQuality     BeamQuality      @relation(fields: [beamQualityId], references: [id])
   productionInfos ProductionInfo[]
   takas           Taka[]
 
-  @@unique([firmId, beamNo])
-  @@index([firmId])                      // firm-scope filter on every list query
-  @@index([firmId, beamQualityId])       // filter by quality within a firm
-  @@index([firmId, deletedAt])           // soft-delete filter performance
+  @@unique([beamNo])
+  @@index([beamQualityId])
+  @@index([deletedAt])
   @@map("beams")
 }
 
@@ -135,6 +134,7 @@ model ProductionInfo {
   machineId               String
   beamId                  String
   entryDate               DateTime
+  takaNo                  String?                        // unique within the beam; can repeat across beams
   takaSrNo                String
   takaMeter               Decimal   @db.Decimal(10, 2)
   productionQualityId     String                         // FK → ProductionQuality.id
@@ -161,6 +161,7 @@ model ProductionInfo {
 
   @@unique([firmId, takaSrNo])
   @@unique([firmId, productionChallanNo])
+  @@unique([beamId, takaNo])                              // takaNo unique within a beam
   @@index([firmId])                                       // firm-scope on all list queries
   @@index([firmId, entryDate])                            // date range filter (most common filter)
   @@index([firmId, machineId])                            // machine-info view — latest entry per machine
@@ -169,6 +170,7 @@ model ProductionInfo {
   @@index([firmId, millOutvertId])                        // outvert sync lookup
   @@index([firmId, millInvertId])                         // invert sync lookup
   @@index([firmId, deletedAt])                            // soft-delete filter
+  @@index([beamId, takaNo])                               // beam-scoped takaNo lookup
   @@map("production_info")
 }
 

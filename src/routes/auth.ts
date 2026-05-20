@@ -371,6 +371,91 @@ function assertSuperAdmin(req: Request): void {
 /**
  * @openapi
  * /api/v1/auth/users:
+ *   get:
+ *     summary: List all users (super_admin only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Paginated list of all users
+ *       403:
+ *         description: Super admin only
+ */
+router.get("/users", authMiddleware, async (req: Request, res: Response) => {
+  assertSuperAdmin(req);
+
+  const search = req.query.search as string | undefined;
+  const status = req.query.status as string | undefined;
+  const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
+  const limit = Math.min(
+    100,
+    Math.max(1, parseInt((req.query.limit as string) ?? "20", 10)),
+  );
+  const skip = (page - 1) * limit;
+
+  const where = {
+    deletedAt: null,
+    ...(status && { status }),
+    ...(search && {
+      OR: [
+        { name: { contains: search, mode: "insensitive" as const } },
+        { email: { contains: search, mode: "insensitive" as const } },
+      ],
+    }),
+  };
+
+  const [total, users] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      where,
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  res.json({
+    success: true,
+    data: users,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  });
+});
+
+/**
+ * @openapi
+ * /api/v1/auth/users:
  *   post:
  *     summary: Create a user directly (super_admin only)
  *     tags: [Auth]

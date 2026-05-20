@@ -36,11 +36,8 @@ function assertSuperAdmin(req: Request): void {
  *     responses:
  *       200:
  *         description: Paginated list of firms
- *       403:
- *         description: Super admin only
  */
 router.get("/", authMiddleware, async (req: Request, res: Response) => {
-  assertSuperAdmin(req);
 
   const search = req.query.search as string | undefined;
   const status = req.query.status as string | undefined;
@@ -153,8 +150,7 @@ router.post("/", authMiddleware, async (req: Request, res: Response) => {
  *         description: Not found
  */
 router.get("/:id", authMiddleware, async (req: Request, res: Response) => {
-  assertSuperAdmin(req);
-
+  
   const firm = await prisma.firm.findFirst({
     where: { id: req.params.id as string, deletedAt: null },
   });

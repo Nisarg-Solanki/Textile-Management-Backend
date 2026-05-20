@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const createBeamSchema = z.object({
-  firmId: z.string().uuid(),
   beamNo: z.string().min(1).max(50),
   tar: z.number().int().positive(),
   beamQualityId: z.string().uuid(),

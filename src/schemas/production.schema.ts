@@ -5,6 +5,7 @@ export const createProductionSchema = z.object({
   machineId: z.string().uuid(),
   beamId: z.string().uuid(),
   entryDate: z.string().datetime(),
+  takaNo: z.string().min(1),
   takaSrNo: z.string().min(1),
   takaMeter: z.number().positive(),
   productionQualityId: z.string().uuid(),
