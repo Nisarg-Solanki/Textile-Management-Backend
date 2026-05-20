@@ -68,7 +68,9 @@ router.get(
           productionInfos: {
             where: { deletedAt: null },
             orderBy: { entryDate: "desc" },
-            include: {
+            select: {
+              beamId: true,
+              takaNo: true,
               beam: {
                 select: {
                   id: true,
@@ -84,9 +86,8 @@ router.get(
     ]);
 
     type ProdEntry = (typeof machines)[number]["productionInfos"][number];
-    type BeamEntry = ProdEntry["beam"] & {
-      takas: NonNullable<ProdEntry["taka"]>[];
-    };
+    type TakaEntry = NonNullable<ProdEntry["taka"]> & { takaNo: string | null };
+    type BeamEntry = ProdEntry["beam"] & { takas: TakaEntry[] };
 
     const data = machines.map((machine) => {
       const { productionInfos, ...machineFields } = machine;
@@ -98,7 +99,7 @@ router.get(
           beamMap.set(prod.beamId, { ...prod.beam, takas: [] });
         }
         if (prod.taka) {
-          beamMap.get(prod.beamId)!.takas.push(prod.taka);
+          beamMap.get(prod.beamId)!.takas.push({ ...prod.taka, takaNo: prod.takaNo });
         }
       }
 

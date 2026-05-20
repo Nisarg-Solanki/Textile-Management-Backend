@@ -51,12 +51,15 @@ export async function createProductionEntry(
     throw new AppError(404, "Machine not found in this firm", "MACHINE_NOT_FOUND");
   }
 
-  // Step 4 — verify beam belongs to this firm
+  // Step 4 — verify beam exists and is not already assigned to a different firm
   const beam = await prisma.beam.findFirst({
-    where: { id: data.beamId, firmId: data.firmId, deletedAt: null },
+    where: { id: data.beamId, deletedAt: null },
   });
   if (!beam) {
-    throw new AppError(404, "Beam not found in this firm", "BEAM_NOT_FOUND");
+    throw new AppError(404, "Beam not found", "BEAM_NOT_FOUND");
+  }
+  if (beam.firmId && beam.firmId !== data.firmId) {
+    throw new AppError(409, "Beam belongs to a different firm", "BEAM_FIRM_MISMATCH");
   }
 
   // Step 5 — takaSrNo must be unique within the firm
@@ -68,6 +71,18 @@ export async function createProductionEntry(
       409,
       "Taka Sr No already exists in this firm",
       "TAKA_SR_NO_DUPLICATE",
+    );
+  }
+
+  // Step 5b — takaNo must be unique within the beam
+  const existingTakaNo = await prisma.productionInfo.findFirst({
+    where: { beamId: data.beamId, takaNo: data.takaNo, deletedAt: null },
+  });
+  if (existingTakaNo) {
+    throw new AppError(
+      409,
+      "Taka No already exists for this beam",
+      "TAKA_NO_DUPLICATE",
     );
   }
 
@@ -89,6 +104,13 @@ export async function createProductionEntry(
         beamId: production.beamId,
       },
     });
+    // Auto-fill beam's firmId on first production use
+    if (!beam.firmId) {
+      await tx.beam.update({
+        where: { id: production.beamId },
+        data: { firmId: production.firmId },
+      });
+    }
     return tx.productionInfo.findUniqueOrThrow({
       where: { id: production.id },
       include: productionInclude,
@@ -139,6 +161,26 @@ export async function updateProductionEntry(
         409,
         "Taka Sr No already exists in this firm",
         "TAKA_SR_NO_DUPLICATE",
+      );
+    }
+  }
+
+  // Step 3b — takaNo uniqueness within beam (exclude current record)
+  if (data.takaNo !== undefined) {
+    const beamId = data.beamId ?? existing.beamId;
+    const duplicateTakaNo = await prisma.productionInfo.findFirst({
+      where: {
+        beamId,
+        takaNo: data.takaNo,
+        deletedAt: null,
+        NOT: { id },
+      },
+    });
+    if (duplicateTakaNo) {
+      throw new AppError(
+        409,
+        "Taka No already exists for this beam",
+        "TAKA_NO_DUPLICATE",
       );
     }
   }
