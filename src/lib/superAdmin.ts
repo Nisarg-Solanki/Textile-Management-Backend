@@ -2,7 +2,7 @@ export function getSuperAdminEmails(): string[] {
   const raw = process.env.SUPER_ADMIN_EMAILS ?? '';
   return raw
     .split(',')
-    .map((e) => e.trim())
+    .map((e) => e.trim().replace(/^["']|["']$/g, '').trim())
     .filter((e) => e.length > 0);
 }
 

@@ -122,20 +122,31 @@ router.post("/register", async (req: Request, res: Response) => {
 router.post("/login", async (req: Request, res: Response) => {
   const { email, password } = loginSchema.parse(req.body);
 
-  const user = await prisma.user.findFirst({
+  let user = await prisma.user.findFirst({
     where: { email, deletedAt: null },
   });
 
   if (!user)
     throw new AppError(401, "Invalid email or password", "INVALID_CREDENTIALS");
-  if (user.status === "pending")
-    throw new AppError(403, "Account pending approval", "PENDING_APPROVAL");
-  if (user.status === "inactive")
-    throw new AppError(403, "Account is inactive", "ACCOUNT_INACTIVE");
 
   const passwordMatch = await bcryptjs.compare(password, user.passwordHash);
   if (!passwordMatch)
     throw new AppError(401, "Invalid email or password", "INVALID_CREDENTIALS");
+
+  if (
+    isSuperAdminEmail(user.email) &&
+    (user.role !== "super_admin" || user.status !== "active")
+  ) {
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { role: "super_admin", status: "active" },
+    });
+  }
+
+  if (user.status === "pending")
+    throw new AppError(403, "Account pending approval", "PENDING_APPROVAL");
+  if (user.status === "inactive")
+    throw new AppError(403, "Account is inactive", "ACCOUNT_INACTIVE");
 
   const accessToken = signAccessToken({
     userId: user.id,

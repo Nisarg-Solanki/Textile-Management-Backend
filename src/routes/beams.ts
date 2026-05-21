@@ -258,6 +258,21 @@ router.put(
         );
     }
 
+    if (data.beamMeter !== undefined) {
+      const takaAgg = await prisma.taka.aggregate({
+        _sum: { takaMeter: true },
+        where: { beamId: id, deletedAt: null },
+      });
+      const totalTakaMeter = takaAgg._sum.takaMeter ?? new Prisma.Decimal(0);
+      if (totalTakaMeter.greaterThan(new Prisma.Decimal(data.beamMeter))) {
+        throw new AppError(
+          400,
+          `Cannot set beam meter to ${data.beamMeter} — existing takas already total ${totalTakaMeter.toFixed(2)} m`,
+          "BEAM_METER_TOO_SMALL",
+        );
+      }
+    }
+
     const beam = await prisma.beam.update({
       where: { id },
       data,

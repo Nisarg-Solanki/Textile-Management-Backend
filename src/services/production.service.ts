@@ -62,7 +62,22 @@ export async function createProductionEntry(
     throw new AppError(409, "Beam belongs to a different firm", "BEAM_FIRM_MISMATCH");
   }
 
-  // Step 5 — takaSrNo must be unique within the firm
+  // Step 5 — verify new taka meter won't push total over beam meter
+  const takaAgg = await prisma.taka.aggregate({
+    _sum: { takaMeter: true },
+    where: { beamId: data.beamId, deletedAt: null },
+  });
+  const existingTakaTotal = takaAgg._sum.takaMeter ?? new Prisma.Decimal(0);
+  const projectedTotal = existingTakaTotal.add(new Prisma.Decimal(data.takaMeter));
+  if (projectedTotal.greaterThan(beam.beamMeter)) {
+    throw new AppError(
+      400,
+      `Total taka meter (${projectedTotal.toFixed(2)}) would exceed beam meter (${beam.beamMeter.toFixed(2)})`,
+      "TAKA_METER_EXCEEDS_BEAM",
+    );
+  }
+
+  // Step 6 — takaSrNo must be unique within the firm
   const existingTaka = await prisma.productionInfo.findFirst({
     where: { firmId: data.firmId, takaSrNo: data.takaSrNo, deletedAt: null },
   });
@@ -86,7 +101,7 @@ export async function createProductionEntry(
     );
   }
 
-  // Step 6 — atomic create (Rule 1)
+  // Step 7 — atomic create (Rule 1)
   return prisma.$transaction(async (tx) => {
     const { entryDate, ...restProductionData } = productionData;
     const production = await tx.productionInfo.create({
@@ -166,12 +181,15 @@ export async function updateProductionEntry(
   }
 
   // Step 3b — takaNo uniqueness within beam (exclude current record)
-  if (data.takaNo !== undefined) {
-    const beamId = data.beamId ?? existing.beamId;
+  // Triggers when either takaNo or beamId changes — changing beam can cause a collision
+  // even if takaNo stays the same.
+  if (data.takaNo !== undefined || data.beamId !== undefined) {
+    const effectiveBeamIdForTakaNo = data.beamId ?? existing.beamId;
+    const effectiveTakaNo = data.takaNo ?? existing.takaNo;
     const duplicateTakaNo = await prisma.productionInfo.findFirst({
       where: {
-        beamId,
-        takaNo: data.takaNo,
+        beamId: effectiveBeamIdForTakaNo,
+        takaNo: effectiveTakaNo,
         deletedAt: null,
         NOT: { id },
       },
@@ -185,7 +203,37 @@ export async function updateProductionEntry(
     }
   }
 
-  // Step 4 — atomic update (Rule 1)
+  // Step 4 — verify updated taka meter won't exceed beam meter
+  if (data.takaMeter !== undefined || data.beamId !== undefined) {
+    const effectiveBeamId = data.beamId ?? existing.beamId;
+    const effectiveTakaMeter =
+      data.takaMeter !== undefined
+        ? new Prisma.Decimal(data.takaMeter)
+        : existing.takaMeter;
+
+    const beamForCheck = await prisma.beam.findFirst({
+      where: { id: effectiveBeamId, deletedAt: null },
+    });
+    if (!beamForCheck) {
+      throw new AppError(404, "Beam not found", "BEAM_NOT_FOUND");
+    }
+
+    const updateTakaAgg = await prisma.taka.aggregate({
+      _sum: { takaMeter: true },
+      where: { beamId: effectiveBeamId, deletedAt: null, productionInfoId: { not: id } },
+    });
+    const otherTakaTotal = updateTakaAgg._sum.takaMeter ?? new Prisma.Decimal(0);
+    const updateProjected = otherTakaTotal.add(effectiveTakaMeter);
+    if (updateProjected.greaterThan(beamForCheck.beamMeter)) {
+      throw new AppError(
+        400,
+        `Total taka meter (${updateProjected.toFixed(2)}) would exceed beam meter (${beamForCheck.beamMeter.toFixed(2)})`,
+        "TAKA_METER_EXCEEDS_BEAM",
+      );
+    }
+  }
+
+  // Step 5 — atomic update (Rule 1)
   return prisma.$transaction(async (tx) => {
     const { entryDate, ...restUpdateData } = updateData;
     const production = await tx.productionInfo.update({

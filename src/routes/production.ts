@@ -101,7 +101,7 @@ router.get(
       }),
     };
 
-    const [total, data] = await Promise.all([
+    const [total, rawList] = await Promise.all([
       prisma.productionInfo.count({ where }),
       prisma.productionInfo.findMany({
         where,
@@ -123,6 +123,11 @@ router.get(
         },
       }),
     ]);
+
+    const data = rawList.map((r) => ({
+      ...r,
+      taka: r.taka ? { ...r.taka, takaNo: r.takaNo } : null,
+    }));
 
     res.json({
       success: true,
@@ -179,7 +184,13 @@ router.get(
       throw new AppError(404, "Production record not found", "PRODUCTION_NOT_FOUND");
     }
 
-    res.json({ success: true, data: record });
+    res.json({
+      success: true,
+      data: {
+        ...record,
+        taka: record.taka ? { ...record.taka, takaNo: record.takaNo } : null,
+      },
+    });
   },
 );
 
@@ -225,9 +236,14 @@ router.post(
     const body = createProductionSchema.parse(req.body);
     const production = await createProductionEntry(body);
 
-    res
-      .status(201)
-      .json({ success: true, data: production, message: "Created successfully" });
+    res.status(201).json({
+      success: true,
+      data: {
+        ...production,
+        taka: production.taka ? { ...production.taka, takaNo: production.takaNo } : null,
+      },
+      message: "Created successfully",
+    });
   },
 );
 
@@ -286,7 +302,13 @@ router.put(
     const data = updateProductionSchema.parse(body);
     const production = await updateProductionEntry(id, data);
 
-    res.json({ success: true, data: production });
+    res.json({
+      success: true,
+      data: {
+        ...production,
+        taka: production.taka ? { ...production.taka, takaNo: production.takaNo } : null,
+      },
+    });
   },
 );
 
