@@ -77,7 +77,7 @@ router.get(
       }),
     };
 
-    const [total, data] = await Promise.all([
+    const [total, rawList] = await Promise.all([
       prisma.taka.count({ where }),
       prisma.taka.findMany({
         where,
@@ -91,12 +91,18 @@ router.get(
             select: {
               id: true,
               entryDate: true,
+              takaNo: true,
               machine: { select: { id: true, machineNo: true, machineType: true } },
             },
           },
         },
       }),
     ]);
+
+    const data = rawList.map((r) => ({
+      ...r,
+      takaNo: r.productionInfo?.takaNo ?? null,
+    }));
 
     res.json({
       success: true,
@@ -146,7 +152,13 @@ router.get(
 
     if (!taka) throw new AppError(404, "Taka not found", "TAKA_NOT_FOUND");
 
-    res.json({ success: true, data: taka });
+    res.json({
+      success: true,
+      data: {
+        ...taka,
+        takaNo: taka.productionInfo?.takaNo ?? null,
+      },
+    });
   },
 );
 
