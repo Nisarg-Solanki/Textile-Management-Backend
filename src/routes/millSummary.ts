@@ -106,6 +106,7 @@ router.get(
           millName: true,
           millOutvertId: true,
           millInvertId: true,
+          taka: { select: { id: true } },
           millOutvert: {
             select: { outvertDate: true, firmChallanNo: true },
           },

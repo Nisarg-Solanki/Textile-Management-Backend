@@ -14,8 +14,7 @@ export const createProductionSchema = z.object({
   productionChallanNo: z.string().optional(),
 });
 
-// All fields optional; auto-filled fields (millOutvertId, millInvertId,
-// millOutvertDate, millChallanNo, millName) are intentionally absent.
+// All fields optional; auto-filled fields (millOutvertId, millInvertId, millOutvertDate, millChallanNo, millName) are intentionally absent.
 export const updateProductionSchema = createProductionSchema.partial();
 
 export const listProductionQuerySchema = z.object({

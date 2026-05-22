@@ -14,6 +14,7 @@ const permissionEntrySchema = z.object({
     'mill_summary',
     'firms',
     'mills',
+    'dashboard',
   ]),
   canView: z.boolean(),
   canCreate: z.boolean(),

@@ -120,6 +120,8 @@ router.get(
           },
           taka: { select: { id: true, takaSrNo: true, takaMeter: true } },
           productionQuality: { select: { id: true, name: true } },
+          millOutvert: { select: { id: true, firmChallanNo: true, outvertDate: true } },
+          millInvert: { select: { id: true, millChallanNo: true, invertDate: true } },
         },
       }),
     ]);
@@ -294,6 +296,7 @@ router.put(
       "millOutvertId",
       "millInvertId",
       "millOutvertDate",
+      "millInvertDate",
       "millChallanNo",
       "millName",
     ];
