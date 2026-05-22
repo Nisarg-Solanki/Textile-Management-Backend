@@ -14,7 +14,8 @@ type Module =
   | "machine_info"
   | "mill_summary"
   | "firms"
-  | "mills";
+  | "mills"
+  | "dashboard";
 
 type Action = "view" | "create" | "edit" | "delete";
 

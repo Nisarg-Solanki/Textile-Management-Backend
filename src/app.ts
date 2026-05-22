@@ -20,6 +20,7 @@ import millOutvertsRouter from "./routes/millOutverts";
 import millInvertsRouter from "./routes/millInverts";
 import machineInfoRouter from "./routes/machineInfo";
 import millSummaryRouter from "./routes/millSummary";
+import dashboardRouter from "./routes/dashboard";
 
 const app = express();
 
@@ -85,6 +86,7 @@ app.use("/api/v1/mill-outverts", millOutvertsRouter);
 app.use("/api/v1/mill-inverts", millInvertsRouter);
 app.use("/api/v1/machine-info", machineInfoRouter);
 app.use("/api/v1/mill-summary", millSummaryRouter);
+app.use("/api/v1/dashboard", dashboardRouter);
 
 // Health check
 app.get("/api/v1/health", (_req, res) => {
