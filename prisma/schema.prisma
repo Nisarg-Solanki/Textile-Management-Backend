@@ -9,18 +9,21 @@ datasource db {
 }
 
 model Firm {
-  id              String    @id @default(uuid())
-  firmName        String    @unique
-  firmCode        String    @unique
-  challanEnable   Boolean   @default(false)
-  srNoSeries      String?
-  address         String?
-  contactPerson   String?
-  contactNumber   String?
-  status          String    @default("active")   // "active" | "inactive"
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id            String    @id @default(uuid())
+  // firmName / firmCode uniqueness is enforced via partial unique indexes
+  // (WHERE "deletedAt" IS NULL) — see migration. This lets a record be
+  // soft-deleted and re-created with the same value without conflict.
+  firmName      String
+  firmCode      String
+  challanEnable Boolean   @default(false)
+  srNoSeries    String?
+  address       String?
+  contactPerson String?
+  contactNumber String?
+  status        String    @default("active") // "active" | "inactive"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   machines        Machine[]
   beams           Beam[]
@@ -29,27 +32,28 @@ model Firm {
   millOutverts    MillOutvert[]
   millInverts     MillInvert[]
 
-  @@index([status])                      // filter active/inactive firms
-  @@index([deletedAt])                   // soft-delete filter
+  @@index([status]) // filter active/inactive firms
+  @@index([deletedAt]) // soft-delete filter
   @@map("firms")
 }
 
 model Mill {
   id            String    @id @default(uuid())
-  millName      String    @unique
-  millCode      String?   @unique
+  // millName / millCode uniqueness enforced via partial unique indexes (see migration)
+  millName      String
+  millCode      String?
   address       String?
   contactPerson String?
   contactNumber String?
-  status        String    @default("active")     // "active" | "inactive"
+  status        String    @default("active") // "active" | "inactive"
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   deletedAt     DateTime?
 
-  millOutverts  MillOutvert[]
-  millInverts   MillInvert[]
+  millOutverts MillOutvert[]
+  millInverts  MillInvert[]
 
-  @@index([status])                      // filter active/inactive mills
+  @@index([status]) // filter active/inactive mills
   @@index([deletedAt])
   @@map("mills")
 }
@@ -59,31 +63,31 @@ model Machine {
   firmId      String
   machineNo   String
   machineType String?
-  status      String    @default("active")       // "active" | "inactive"
+  status      String    @default("active") // "active" | "inactive"
   remark      String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  firm             Firm             @relation(fields: [firmId], references: [id])
-  productionInfos  ProductionInfo[]
+  firm            Firm             @relation(fields: [firmId], references: [id])
+  productionInfos ProductionInfo[]
 
-  @@unique([firmId, machineNo])
-  @@index([firmId])                      // firm-scope filter
-  @@index([firmId, status])              // list active machines per firm
+  // (firmId, machineNo) uniqueness enforced via partial unique index (see migration)
+  @@index([firmId]) // firm-scope filter
+  @@index([firmId, status]) // list active machines per firm
   @@index([firmId, deletedAt])
   @@map("machines")
 }
 
 model BeamQuality {
-  id          String    @id @default(uuid())
-  name        String    @unique                        // e.g. "60s", "40s/2" — unique globally
-  status      String    @default("active")             // "active" | "inactive"
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  id        String    @id @default(uuid())
+  name      String // unique globally among non-deleted rows (partial unique index — see migration)
+  status    String    @default("active") // "active" | "inactive"
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
-  beams       Beam[]
+  beams Beam[]
 
   @@index([status])
   @@index([deletedAt])
@@ -91,35 +95,35 @@ model BeamQuality {
 }
 
 model Beam {
-  id              String    @id @default(uuid())
-  firmId          String?                              // auto-filled from production; not set at creation
-  beamNo          String
-  tar             Int
-  beamQualityId   String                               // FK → BeamQuality.id
-  takaQty         Int
-  beamMeter       Decimal   @db.Decimal(10, 2)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id            String    @id @default(uuid())
+  firmId        String? // auto-filled from production; not set at creation
+  beamNo        String
+  tar           Int
+  beamQualityId String // FK → BeamQuality.id
+  takaQty       Int
+  beamMeter     Decimal   @db.Decimal(10, 2)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   firm            Firm?            @relation(fields: [firmId], references: [id])
   beamQuality     BeamQuality      @relation(fields: [beamQualityId], references: [id])
   productionInfos ProductionInfo[]
   takas           Taka[]
 
-  @@unique([beamNo])
+  // beamNo uniqueness enforced via partial unique index (see migration)
   @@index([beamQualityId])
   @@index([deletedAt])
   @@map("beams")
 }
 
 model ProductionQuality {
-  id              String    @id @default(uuid())
-  name            String    @unique                      // e.g. "Plain", "Twill" — unique globally
-  status          String    @default("active")           // "active" | "inactive"
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id        String    @id @default(uuid())
+  name      String // unique globally among non-deleted rows (partial unique index — see migration)
+  status    String    @default("active") // "active" | "inactive"
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   productionInfos ProductionInfo[]
 
@@ -129,48 +133,47 @@ model ProductionQuality {
 }
 
 model ProductionInfo {
-  id                      String    @id @default(uuid())
-  firmId                  String
-  machineId               String
-  beamId                  String
-  entryDate               DateTime
-  takaNo                  String?                        // unique within the beam; can repeat across beams
-  takaSrNo                String
-  takaMeter               Decimal   @db.Decimal(10, 2)
-  productionQualityId     String                         // FK → ProductionQuality.id
-  weight                  Decimal   @db.Decimal(10, 2)
-  remark                  String?
-  productionChallanNo     String?                        // Only set if firm.challanEnable = true
-  millOutvertId           String?
-  millInvertId            String?
+  id                  String    @id @default(uuid())
+  firmId              String
+  machineId           String
+  beamId              String
+  entryDate           DateTime
+  takaNo              String? // unique within the beam; can repeat across beams
+  takaSrNo            String
+  takaMeter           Decimal   @db.Decimal(10, 2)
+  productionQualityId String // FK → ProductionQuality.id
+  weight              Decimal   @db.Decimal(10, 2)
+  remark              String?
+  productionChallanNo String? // Only set if firm.challanEnable = true
+  millOutvertId       String?
+  millInvertId        String?
   // Auto-filled from mill operations — never set directly by user
-  millOutvertDate         DateTime?
-  millInvertDate          DateTime?
-  millChallanNo           String?                        // From mill_inverts.millChallanNo
-  millName                String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-  deletedAt               DateTime?
+  millOutvertDate     DateTime?
+  millInvertDate      DateTime?
+  millChallanNo       String? // From mill_inverts.millChallanNo
+  millName            String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
-  firm               Firm              @relation(fields: [firmId], references: [id])
-  machine            Machine           @relation(fields: [machineId], references: [id])
-  beam               Beam              @relation(fields: [beamId], references: [id])
-  productionQuality  ProductionQuality @relation(fields: [productionQualityId], references: [id])
-  millOutvert        MillOutvert?      @relation(fields: [millOutvertId], references: [id])
-  millInvert         MillInvert?       @relation(fields: [millInvertId], references: [id])
-  taka               Taka?
+  firm              Firm              @relation(fields: [firmId], references: [id])
+  machine           Machine           @relation(fields: [machineId], references: [id])
+  beam              Beam              @relation(fields: [beamId], references: [id])
+  productionQuality ProductionQuality @relation(fields: [productionQualityId], references: [id])
+  millOutvert       MillOutvert?      @relation(fields: [millOutvertId], references: [id])
+  millInvert        MillInvert?       @relation(fields: [millInvertId], references: [id])
+  taka              Taka?
 
-  @@unique([firmId, takaSrNo])
-  @@unique([beamId, takaNo])                              // takaNo unique within a beam
-  @@index([firmId])                                       // firm-scope on all list queries
-  @@index([firmId, entryDate])                            // date range filter (most common filter)
-  @@index([firmId, machineId])                            // machine-info view — latest entry per machine
-  @@index([firmId, beamId])                               // filter by beam
-  @@index([firmId, productionQualityId])                  // filter by quality
-  @@index([firmId, millOutvertId])                        // outvert sync lookup
-  @@index([firmId, millInvertId])                         // invert sync lookup
-  @@index([firmId, deletedAt])                            // soft-delete filter
-  @@index([beamId, takaNo])                               // beam-scoped takaNo lookup
+  // (firmId, takaSrNo) and (beamId, takaNo) uniqueness enforced via partial unique indexes (see migration)
+  @@index([firmId]) // firm-scope on all list queries
+  @@index([firmId, entryDate]) // date range filter (most common filter)
+  @@index([firmId, machineId]) // machine-info view — latest entry per machine
+  @@index([firmId, beamId]) // filter by beam
+  @@index([firmId, productionQualityId]) // filter by quality
+  @@index([firmId, millOutvertId]) // outvert sync lookup
+  @@index([firmId, millInvertId]) // invert sync lookup
+  @@index([firmId, deletedAt]) // soft-delete filter
+  @@index([beamId, takaNo]) // beam-scoped takaNo lookup
   @@map("production_info")
 }
 
@@ -189,33 +192,33 @@ model Taka {
   productionInfo ProductionInfo @relation(fields: [productionInfoId], references: [id])
   beam           Beam           @relation(fields: [beamId], references: [id])
 
-  @@unique([firmId, takaSrNo])
-  @@index([firmId])                      // firm-scope filter
-  @@index([firmId, beamId])              // filter takas by beam
+  // (firmId, takaSrNo) uniqueness enforced via partial unique index (see migration)
+  @@index([firmId]) // firm-scope filter
+  @@index([firmId, beamId]) // filter takas by beam
   @@index([firmId, deletedAt])
   @@map("takas")
 }
 
 model MillOutvert {
-  id             String    @id @default(uuid())
-  firmId         String
-  millId         String
-  outvertDate    DateTime
-  firmChallanNo  String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
+  id            String    @id @default(uuid())
+  firmId        String
+  millId        String
+  outvertDate   DateTime
+  firmChallanNo String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
-  firm             Firm               @relation(fields: [firmId], references: [id])
-  mill             Mill               @relation(fields: [millId], references: [id])
-  outvertTakas     MillOutvertTaka[]
-  millInverts      MillInvert[]
-  productionInfos  ProductionInfo[]
+  firm            Firm              @relation(fields: [firmId], references: [id])
+  mill            Mill              @relation(fields: [millId], references: [id])
+  outvertTakas    MillOutvertTaka[]
+  millInverts     MillInvert[]
+  productionInfos ProductionInfo[]
 
-  @@unique([firmId, firmChallanNo])
-  @@index([firmId])                      // firm-scope filter
-  @@index([firmId, millId])              // filter by mill
-  @@index([firmId, outvertDate])         // date range filter
+  // (firmId, firmChallanNo) uniqueness enforced via partial unique index (see migration)
+  @@index([firmId]) // firm-scope filter
+  @@index([firmId, millId]) // filter by mill
+  @@index([firmId, outvertDate]) // date range filter
   @@index([firmId, deletedAt])
   @@map("mill_outverts")
 }
@@ -231,35 +234,35 @@ model MillOutvertTaka {
   millOutvert MillOutvert @relation(fields: [millOutvertId], references: [id])
 
   @@unique([millOutvertId, takaSrNo])
-  @@index([millOutvertId])               // lookup all takas for an outvert
-  @@index([takaSrNo])                    // mill summary — find outvert for a given taka
+  @@index([millOutvertId]) // lookup all takas for an outvert
+  @@index([takaSrNo]) // mill summary — find outvert for a given taka
   @@index([firmId])
   @@map("mill_outvert_takas")
 }
 
 model MillInvert {
-  id              String    @id @default(uuid())
-  firmId          String
-  millId          String
-  millOutvertId   String
-  invertDate      DateTime
-  millChallanNo   String    @unique                  // Mill's own reference — unique globally
-  firmChallanNo   String                             // References the outvert's firmChallanNo
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id            String    @id @default(uuid())
+  firmId        String
+  millId        String
+  millOutvertId String
+  invertDate    DateTime
+  millChallanNo String // Mill's own reference — unique globally among non-deleted rows (partial unique index — see migration)
+  firmChallanNo String // References the outvert's firmChallanNo
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
-  firm            Firm              @relation(fields: [firmId], references: [id])
-  mill            Mill              @relation(fields: [millId], references: [id])
-  millOutvert     MillOutvert       @relation(fields: [millOutvertId], references: [id])
+  firm            Firm             @relation(fields: [firmId], references: [id])
+  mill            Mill             @relation(fields: [millId], references: [id])
+  millOutvert     MillOutvert      @relation(fields: [millOutvertId], references: [id])
   invertTakas     MillInvertTaka[]
   productionInfos ProductionInfo[]
 
-  @@unique([firmId, firmChallanNo])
-  @@index([firmId])                      // firm-scope filter
-  @@index([firmId, millId])              // filter by mill
-  @@index([firmId, invertDate])          // date range filter
-  @@index([millOutvertId])               // match invert back to its outvert
+  // millChallanNo and (firmId, firmChallanNo) uniqueness enforced via partial unique indexes (see migration)
+  @@index([firmId]) // firm-scope filter
+  @@index([firmId, millId]) // filter by mill
+  @@index([firmId, invertDate]) // date range filter
+  @@index([millOutvertId]) // match invert back to its outvert
   @@index([firmId, deletedAt])
   @@map("mill_inverts")
 }
@@ -275,8 +278,8 @@ model MillInvertTaka {
   millInvert MillInvert @relation(fields: [millInvertId], references: [id])
 
   @@unique([millInvertId, takaSrNo])
-  @@index([millInvertId])               // lookup all takas for an invert
-  @@index([takaSrNo])                   // mill summary — find invert for a given taka
+  @@index([millInvertId]) // lookup all takas for an invert
+  @@index([takaSrNo]) // mill summary — find invert for a given taka
   @@index([firmId])
   @@map("mill_invert_takas")
 }
@@ -284,10 +287,10 @@ model MillInvertTaka {
 model User {
   id           String    @id @default(uuid())
   name         String
-  email        String    @unique
+  email        String // unique among non-deleted rows (partial unique index — see migration)
   passwordHash String
-  role         String    @default("admin")          // "super_admin" | "admin"
-  status       String    @default("pending")         // "active" | "inactive" | "pending"
+  role         String    @default("admin") // "super_admin" | "admin"
+  status       String    @default("pending") // "active" | "inactive" | "pending"
   lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -304,7 +307,7 @@ model User {
 model AdminPermission {
   id        String  @id @default(uuid())
   userId    String
-  module    String  // "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
+  module    String // "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
   canView   Boolean @default(false)
   canCreate Boolean @default(false)
   canEdit   Boolean @default(false)

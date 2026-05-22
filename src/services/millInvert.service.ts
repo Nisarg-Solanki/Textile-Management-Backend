@@ -45,9 +45,9 @@ export async function createMillInvert(
     throw new AppError(404, "Mill outvert not found", "MILL_OUTVERT_NOT_FOUND");
   }
 
-  // Step 4 — millChallanNo must be globally unique
+  // Step 4 — millChallanNo must be globally unique among non-deleted rows
   const existingMillChallan = await prisma.millInvert.findFirst({
-    where: { millChallanNo: data.millChallanNo },
+    where: { millChallanNo: data.millChallanNo, deletedAt: null },
   });
   if (existingMillChallan) {
     throw new AppError(
@@ -139,7 +139,7 @@ export async function updateMillInvert(
   // Step 2 — if millChallanNo changing, check global uniqueness (exclude current id)
   if (data.millChallanNo !== undefined && data.millChallanNo !== existing.millChallanNo) {
     const duplicate = await prisma.millInvert.findFirst({
-      where: { millChallanNo: data.millChallanNo, NOT: { id } },
+      where: { millChallanNo: data.millChallanNo, deletedAt: null, NOT: { id } },
     });
     if (duplicate) {
       throw new AppError(
