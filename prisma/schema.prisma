@@ -145,6 +145,7 @@ model ProductionInfo {
   millInvertId            String?
   // Auto-filled from mill operations — never set directly by user
   millOutvertDate         DateTime?
+  millInvertDate          DateTime?
   millChallanNo           String?                        // From mill_inverts.millChallanNo
   millName                String?
   createdAt               DateTime  @default(now())
@@ -160,7 +161,6 @@ model ProductionInfo {
   taka               Taka?
 
   @@unique([firmId, takaSrNo])
-  @@unique([firmId, productionChallanNo])
   @@unique([beamId, takaNo])                              // takaNo unique within a beam
   @@index([firmId])                                       // firm-scope on all list queries
   @@index([firmId, entryDate])                            // date range filter (most common filter)

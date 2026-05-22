@@ -110,6 +110,7 @@ export async function createMillInvert(
       },
       data: {
         millInvertId: invert.id,
+        millInvertDate: invert.invertDate,
         millChallanNo: data.millChallanNo,
         millName: mill.millName,
       },
@@ -225,7 +226,7 @@ export async function updateMillInvert(
             firmId: existing.firmId,
             deletedAt: null,
           },
-          data: { millInvertId: null, millChallanNo: null, millName: null },
+          data: { millInvertId: null, millInvertDate: null, millChallanNo: null, millName: null },
         });
       }
 
@@ -238,6 +239,7 @@ export async function updateMillInvert(
         where: { takaSrNo: { in: takaSrNos }, firmId, deletedAt: null },
         data: {
           millInvertId: id,
+          millInvertDate: updated.invertDate,
           millChallanNo: updated.millChallanNo,
           millName: mill.millName,
         },
@@ -271,7 +273,7 @@ export async function deleteMillInvert(id: string): Promise<void> {
           takaSrNo: { in: takaSrNos },
           deletedAt: null,
         },
-        data: { millInvertId: null, millChallanNo: null, millName: null },
+        data: { millInvertId: null, millInvertDate: null, millChallanNo: null, millName: null },
       });
     }
 
