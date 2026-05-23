@@ -10,7 +10,7 @@ const router = Router();
  * @openapi
  * /api/v1/mill-summary:
  *   get:
- *     summary: Mill dispatch/receipt summary per taka (auto-generated view)
+ *     summary: Mill dispatch/receipt summary grouped by firm challan number
  *     tags: [MillSummary]
  *     security:
  *       - bearerAuth: []
@@ -18,7 +18,7 @@ const router = Router();
  *       - in: query
  *         name: search
  *         schema: { type: string }
- *         description: Search by takaSrNo
+ *         description: Search by takaSrNo within a challan group
  *       - in: query
  *         name: mill
  *         schema: { type: string }
@@ -26,15 +26,15 @@ const router = Router();
  *       - in: query
  *         name: status
  *         schema: { type: string, enum: [sent, returned, pending] }
- *         description: "sent = outvert exists, no invert; returned = invert exists; pending = no outvert"
+ *         description: "sent = outvert exists with no active invert; returned = active invert exists; pending = no outvert"
  *       - in: query
  *         name: date_from
  *         schema: { type: string, format: date }
- *         description: Filter millOutvertDate >= date_from
+ *         description: Filter outvertDate >= date_from
  *       - in: query
  *         name: date_to
  *         schema: { type: string, format: date }
- *         description: Filter millOutvertDate <= date_to
+ *         description: Filter outvertDate <= date_to
  *       - in: query
  *         name: firmId
  *         schema: { type: string }
@@ -46,7 +46,9 @@ const router = Router();
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Paginated mill summary
+ *         description: >
+ *           Grouped mill summary. Each item represents one firm challan (outvert).
+ *           status=pending returns individual production entries with null challan fields.
  *       403:
  *         description: Forbidden
  */
@@ -68,58 +70,184 @@ router.get(
     );
     const skip = (page - 1) * limit;
 
-    const statusFilter: Prisma.ProductionInfoWhereInput =
-      status === "sent"
-        ? { millOutvertId: { not: null }, millInvertId: null }
-        : status === "returned"
-          ? { millInvertId: { not: null } }
-          : status === "pending"
-            ? { millOutvertId: null }
-            : {};
+    if (status === "pending") {
+      const pendingWhere: Prisma.ProductionInfoWhereInput = {
+        deletedAt: null,
+        millOutvertId: null,
+        ...(firmId && { firmId }),
+        ...(search && {
+          takaSrNo: { contains: search, mode: "insensitive" as const },
+        }),
+      };
 
-    const where: Prisma.ProductionInfoWhereInput = {
+      const [total, rows] = await Promise.all([
+        prisma.productionInfo.count({ where: pendingWhere }),
+        prisma.productionInfo.findMany({
+          where: pendingWhere,
+          skip,
+          take: limit,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            takaSrNo: true,
+            takaMeter: true,
+            entryDate: true,
+            weight: true,
+            remark: true,
+            productionChallanNo: true,
+            millOutvertId: true,
+            millOutvertDate: true,
+            millInvertId: true,
+            millChallanNo: true,
+            millName: true,
+            firm: { select: { id: true, firmName: true, firmCode: true } },
+            machine: { select: { id: true, machineNo: true, machineType: true } },
+            beam: {
+              select: {
+                id: true,
+                beamNo: true,
+                beamMeter: true,
+                beamQuality: { select: { id: true, name: true } },
+              },
+            },
+            productionQuality: { select: { id: true, name: true } },
+            millOutvert: {
+              select: { id: true, firmChallanNo: true, outvertDate: true },
+            },
+            millInvert: {
+              select: { id: true, millChallanNo: true, invertDate: true },
+            },
+            taka: { select: { id: true } },
+          },
+        }),
+      ]);
+
+      const data = rows.map((production) => ({
+        firmChallanNo: null as string | null,
+        firm: production.firm,
+        mill: null as { id: string; millName: string; millCode: string | null } | null,
+        millOutvertId: null as string | null,
+        outvertDate: null as Date | null,
+        invertDate: null as Date | null,
+        millChallanNo: null as string | null,
+        millInvertId: null as string | null,
+        status: "pending" as const,
+        productions: [production],
+        takaCount: 1,
+      }));
+
+      return res.json({
+        success: true,
+        data,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    }
+
+    // Grouped view — paginate by MillOutvert (one group per firmChallanNo)
+    const outvertWhere: Prisma.MillOutvertWhereInput = {
       deletedAt: null,
       ...(firmId && { firmId }),
-      ...(search && {
-        takaSrNo: { contains: search, mode: "insensitive" as const },
-      }),
-      ...(dateFrom && { millOutvertDate: { gte: new Date(dateFrom) } }),
-      ...(dateTo && { millOutvertDate: { lte: new Date(dateTo) } }),
-      ...statusFilter,
       ...(mill && {
-        millName: { contains: mill, mode: "insensitive" as const },
+        mill: { millName: { contains: mill, mode: "insensitive" as const } },
+      }),
+      ...(dateFrom && { outvertDate: { gte: new Date(dateFrom) } }),
+      ...(dateTo && { outvertDate: { lte: new Date(dateTo) } }),
+      ...(status === "sent" && {
+        millInverts: { none: { deletedAt: null } },
+      }),
+      ...(status === "returned" && {
+        millInverts: { some: { deletedAt: null } },
+      }),
+      ...(search && {
+        outvertTakas: {
+          some: {
+            takaSrNo: { contains: search, mode: "insensitive" as const },
+          },
+        },
       }),
     };
 
-    const [total, rows] = await Promise.all([
-      prisma.productionInfo.count({ where }),
-      prisma.productionInfo.findMany({
-        where,
+    const [total, outverts] = await Promise.all([
+      prisma.millOutvert.count({ where: outvertWhere }),
+      prisma.millOutvert.findMany({
+        where: outvertWhere,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          takaSrNo: true,
-          millOutvertDate: true,
-          millChallanNo: true,
-          millName: true,
-          millOutvertId: true,
-          millInvertId: true,
-          taka: { select: { id: true } },
-          millOutvert: {
-            select: { outvertDate: true, firmChallanNo: true },
+        orderBy: { outvertDate: "desc" },
+        include: {
+          firm: { select: { id: true, firmName: true, firmCode: true } },
+          mill: { select: { id: true, millName: true, millCode: true } },
+          millInverts: {
+            where: { deletedAt: null },
+            select: { id: true, invertDate: true, millChallanNo: true },
+            orderBy: { invertDate: "desc" },
+            take: 1,
           },
-          millInvert: {
-            select: { invertDate: true, millChallanNo: true },
+          productionInfos: {
+            where: { deletedAt: null },
+            select: {
+              id: true,
+              takaSrNo: true,
+              takaMeter: true,
+              entryDate: true,
+              weight: true,
+              remark: true,
+              productionChallanNo: true,
+              millOutvertId: true,
+              millOutvertDate: true,
+              millInvertId: true,
+              millChallanNo: true,
+              millName: true,
+              machine: { select: { id: true, machineNo: true, machineType: true } },
+              beam: {
+                select: {
+                  id: true,
+                  beamNo: true,
+                  beamMeter: true,
+                  beamQuality: { select: { id: true, name: true } },
+                },
+              },
+              productionQuality: { select: { id: true, name: true } },
+              millOutvert: {
+                select: { id: true, firmChallanNo: true, outvertDate: true },
+              },
+              millInvert: {
+                select: { id: true, millChallanNo: true, invertDate: true },
+              },
+              taka: { select: { id: true } },
+            },
+            orderBy: { takaSrNo: "asc" },
           },
         },
       }),
     ]);
 
+    const data = outverts.map((outvert) => {
+      const latestInvert = outvert.millInverts[0] ?? null;
+
+      return {
+        firmChallanNo: outvert.firmChallanNo,
+        firm: outvert.firm,
+        mill: outvert.mill,
+        millOutvertId: outvert.id,
+        outvertDate: outvert.outvertDate,
+        invertDate: latestInvert?.invertDate ?? null,
+        millChallanNo: latestInvert?.millChallanNo ?? null,
+        millInvertId: latestInvert?.id ?? null,
+        status: latestInvert !== null ? ("returned" as const) : ("sent" as const),
+        productions: outvert.productionInfos,
+        takaCount: outvert.productionInfos.length,
+      };
+    });
+
     res.json({
       success: true,
-      data: rows,
+      data,
       pagination: {
         total,
         page,
