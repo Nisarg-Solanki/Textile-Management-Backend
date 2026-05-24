@@ -65,7 +65,7 @@ backend/
 │   │   ├── machines.ts        # CRUD for machines — /api/v1/machines
 │   │   ├── beams.ts           # CRUD for beams — /api/v1/beams (supports ?getAll=true for unpaginated)
 │   │   ├── production.ts      # CRUD for production_info — /api/v1/production (delegates writes to service)
-│   │   ├── takas.ts           # GET only (view) — /api/v1/takas
+│   │   ├── takas.ts           # GET only (view) — /api/v1/takas (supports ?status=not_sent|at_mill|returned)
 │   │   ├── millOutverts.ts    # CRUD for mill_outverts — /api/v1/mill-outverts (delegates to service)
 │   │   ├── millInverts.ts     # CRUD for mill_inverts — /api/v1/mill-inverts (delegates to service)
 │   │   ├── machineInfo.ts     # GET only (view) — /api/v1/machine-info
@@ -688,7 +688,10 @@ DELETE /api/v1/production/:id    # Soft delete + soft delete linked Taka
 ### Takas (GET only)
 
 ```
-GET    /api/v1/takas             # ?search= &beam_no= &meter_min= &meter_max= &firmId=
+GET    /api/v1/takas             # ?search= &beam_no= &meter_min= &meter_max= &firmId= &status=
+                                 # status: not_sent (no millOutvertId) | at_mill (outvert set, no invert)
+                                 #         | returned (millInvertId set)
+                                 # Invalid status value → 400 INVALID_STATUS
 GET    /api/v1/takas/:id         # Get single Taka with linked ProductionInfo
 ```
 
@@ -698,6 +701,7 @@ GET    /api/v1/takas/:id         # Get single Taka with linked ProductionInfo
 GET    /api/v1/mill-outverts           # ?search= &mill= &date_from= &date_to= &firmId=
 POST   /api/v1/mill-outverts           # Create + sync ProductionInfo (atomic)
 GET    /api/v1/mill-outverts/:id       # Get single outvert with Taka list
+                                       # outvertTakas items include takaMeter (resolved from Taka table)
 PUT    /api/v1/mill-outverts/:id       # Update + re-sync ProductionInfo
 DELETE /api/v1/mill-outverts/:id       # Soft delete + clear mill fields in ProductionInfo
 ```
@@ -708,6 +712,7 @@ DELETE /api/v1/mill-outverts/:id       # Soft delete + clear mill fields in Prod
 GET    /api/v1/mill-inverts            # ?search= &mill= &date_from= &date_to= &firmId=
 POST   /api/v1/mill-inverts            # Create + sync ProductionInfo (atomic)
 GET    /api/v1/mill-inverts/:id        # Get single invert with Taka list
+                                       # invertTakas items include takaMeter (resolved from Taka table)
 PUT    /api/v1/mill-inverts/:id        # Update + re-sync ProductionInfo
 DELETE /api/v1/mill-inverts/:id        # Soft delete + clear invert fields in ProductionInfo
 ```
