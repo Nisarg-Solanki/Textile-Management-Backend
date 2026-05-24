@@ -1428,8 +1428,19 @@ All tests use **unit-style mocking** — no real database or network calls.
 // Include every model whose methods the route-under-test calls.
 jest.mock("../lib/prisma", () => ({
   prisma: {
-    user: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn() },
-    passwordResetToken: { findMany: jest.fn(), deleteMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+    user: {
+      findFirst: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      count: jest.fn(),
+    },
+    passwordResetToken: {
+      findMany: jest.fn(),
+      deleteMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    },
     adminPermission: { findMany: jest.fn(), deleteMany: jest.fn() },
     $transaction: jest.fn(),
   },
@@ -1451,8 +1462,12 @@ to safe defaults in `beforeEach` to prevent state from leaking across tests:
 ```typescript
 beforeEach(() => {
   jest.clearAllMocks();
-  mockVerify.mockReturnValue({ userId: SUPER_ADMIN_ID, role: "super_admin", email: "..." });
-  mockIsSuperAdmin.mockReturnValue(false);   // prevent leak from tests that set it to true
+  mockVerify.mockReturnValue({
+    userId: SUPER_ADMIN_ID,
+    role: "super_admin",
+    email: "...",
+  });
+  mockIsSuperAdmin.mockReturnValue(false); // prevent leak from tests that set it to true
   mockBcrypt.compare.mockResolvedValue(true); // prevent leak from "wrong password" tests
   db.$transaction.mockImplementation(async (cb) => cb(db));
 });
