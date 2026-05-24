@@ -160,7 +160,22 @@ router.get(
       throw new AppError(404, "Mill invert not found", "MILL_INVERT_NOT_FOUND");
     }
 
-    res.json({ success: true, data: invert });
+    // Resolve takaMeter for each invertTaka from the Taka table
+    const takaSrNos = invert.invertTakas.map((t) => t.takaSrNo);
+    const takaMeters =
+      takaSrNos.length > 0
+        ? await prisma.taka.findMany({
+            where: { takaSrNo: { in: takaSrNos }, firmId: invert.firmId, deletedAt: null },
+            select: { takaSrNo: true, takaMeter: true },
+          })
+        : [];
+    const meterMap = new Map(takaMeters.map((t) => [t.takaSrNo, t.takaMeter]));
+    const invertTakasWithMeter = invert.invertTakas.map((t) => ({
+      ...t,
+      takaMeter: meterMap.get(t.takaSrNo) ?? null,
+    }));
+
+    res.json({ success: true, data: { ...invert, invertTakas: invertTakasWithMeter } });
   },
 );
 

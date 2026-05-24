@@ -153,7 +153,22 @@ router.get(
       throw new AppError(404, "Mill outvert not found", "MILL_OUTVERT_NOT_FOUND");
     }
 
-    res.json({ success: true, data: outvert });
+    // Resolve takaMeter for each outvertTaka from the Taka table
+    const takaSrNos = outvert.outvertTakas.map((t) => t.takaSrNo);
+    const takaMeters =
+      takaSrNos.length > 0
+        ? await prisma.taka.findMany({
+            where: { takaSrNo: { in: takaSrNos }, firmId: outvert.firmId, deletedAt: null },
+            select: { takaSrNo: true, takaMeter: true },
+          })
+        : [];
+    const meterMap = new Map(takaMeters.map((t) => [t.takaSrNo, t.takaMeter]));
+    const outvertTakasWithMeter = outvert.outvertTakas.map((t) => ({
+      ...t,
+      takaMeter: meterMap.get(t.takaSrNo) ?? null,
+    }));
+
+    res.json({ success: true, data: { ...outvert, outvertTakas: outvertTakasWithMeter } });
   },
 );
 

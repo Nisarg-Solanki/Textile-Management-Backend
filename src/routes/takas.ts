@@ -34,6 +34,12 @@ const router = Router();
  *         name: firmId
  *         schema: { type: string }
  *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [not_sent, at_mill, returned]
+ *         description: Filter by mill dispatch status
+ *       - in: query
  *         name: page
  *         schema: { type: integer }
  *       - in: query
@@ -55,12 +61,27 @@ router.get(
     const meterMin = req.query.meter_min as string | undefined;
     const meterMax = req.query.meter_max as string | undefined;
     const firmId = req.query.firmId as string | undefined;
+    const status = req.query.status as string | undefined;
     const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
     const limit = Math.min(
       100,
       Math.max(1, parseInt((req.query.limit as string) ?? "20", 10)),
     );
     const skip = (page - 1) * limit;
+
+    const validStatuses = ["not_sent", "at_mill", "returned"];
+    if (status && !validStatuses.includes(status)) {
+      throw new AppError(400, "Invalid status value. Must be one of: not_sent, at_mill, returned", "INVALID_STATUS");
+    }
+
+    const statusFilter: Prisma.TakaWhereInput =
+      status === "not_sent"
+        ? { productionInfo: { millOutvertId: null } }
+        : status === "at_mill"
+          ? { productionInfo: { millOutvertId: { not: null }, millInvertId: null } }
+          : status === "returned"
+            ? { productionInfo: { millInvertId: { not: null } } }
+            : {};
 
     const where: Prisma.TakaWhereInput = {
       deletedAt: null,
@@ -75,6 +96,7 @@ router.get(
           { takaSrNo: { contains: search, mode: "insensitive" as const } },
         ],
       }),
+      ...statusFilter,
     };
 
     const [total, rawList] = await Promise.all([
