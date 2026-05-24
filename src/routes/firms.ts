@@ -66,6 +66,13 @@ router.get("/", authMiddleware, async (req: Request, res: Response) => {
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        firmName: true,
+        firmCode: true,
+        challanEnable: true,
+        status: true,
+      },
     }),
   ]);
 
@@ -153,6 +160,17 @@ router.get("/:id", authMiddleware, async (req: Request, res: Response) => {
   
   const firm = await prisma.firm.findFirst({
     where: { id: req.params.id as string, deletedAt: null },
+    select: {
+      id: true,
+      firmName: true,
+      firmCode: true,
+      challanEnable: true,
+      srNoSeries: true,
+      address: true,
+      contactPerson: true,
+      contactNumber: true,
+      status: true,
+    },
   });
   if (!firm) throw new AppError(404, "Firm not found", "FIRM_NOT_FOUND");
 

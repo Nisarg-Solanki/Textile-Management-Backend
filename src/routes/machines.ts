@@ -75,7 +75,14 @@ router.get(
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
-        include: { firm: { select: { id: true, firmName: true, firmCode: true } } },
+        select: {
+          id: true,
+          machineNo: true,
+          machineType: true,
+          status: true,
+          remark: true,
+          firm: { select: { firmName: true } },
+        },
       }),
     ]);
 
@@ -113,7 +120,15 @@ router.get(
   async (req: Request, res: Response) => {
     const machine = await prisma.machine.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
-      include: { firm: { select: { id: true, firmName: true, firmCode: true } } },
+      select: {
+        id: true,
+        firmId: true,
+        machineNo: true,
+        machineType: true,
+        remark: true,
+        status: true,
+        firm: { select: { firmName: true } },
+      },
     });
     if (!machine)
       throw new AppError(404, "Machine not found", "MACHINE_NOT_FOUND");

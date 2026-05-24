@@ -218,15 +218,13 @@ router.get(
       }
       return {
         label: b.label,
-        periodStart: b.periodStart.toISOString(),
-        periodEnd: b.periodEnd.toISOString(),
         value: Math.round(sum * 100) / 100,
       };
     });
 
     res.json({
       success: true,
-      data: { type, points },
+      data: { points },
     });
   },
 );

@@ -63,7 +63,15 @@ router.get(
         skip,
         take: limit,
         orderBy: { machineNo: "asc" },
-        include: {
+        select: {
+          id: true,
+          firmId: true,
+          machineNo: true,
+          machineType: true,
+          status: true,
+          remark: true,
+          createdAt: true,
+          updatedAt: true,
           firm: { select: { id: true, firmName: true, firmCode: true } },
           productionInfos: {
             where: { deletedAt: null },

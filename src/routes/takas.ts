@@ -84,28 +84,37 @@ router.get(
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
-        include: {
-          firm: { select: { id: true, firmName: true, firmCode: true } },
-          beam: { select: { id: true, beamNo: true, beamQuality: { select: { id: true, name: true } } } },
+        select: {
+          id: true,
+          takaSrNo: true,
+          takaMeter: true,
+          createdAt: true,
+          firm: { select: { firmName: true } },
+          beam: { select: { beamNo: true } },
           productionInfo: {
             select: {
-              id: true,
-              entryDate: true,
               takaNo: true,
               millOutvertDate: true,
-              millInvertDate: true,
               millInvertId: true,
-              machine: { select: { id: true, machineNo: true, machineType: true } },
             },
           },
         },
       }),
     ]);
 
-    const data = rawList.map((r) => ({
-      ...r,
-      takaNo: r.productionInfo?.takaNo ?? null,
-    }));
+    const data = rawList.map((r) => {
+      const { productionInfo, ...rest } = r;
+      return {
+        ...rest,
+        takaNo: productionInfo?.takaNo ?? null,
+        productionInfo: productionInfo
+          ? {
+              millOutvertDate: productionInfo.millOutvertDate,
+              millInvertId: productionInfo.millInvertId,
+            }
+          : null,
+      };
+    });
 
     res.json({
       success: true,
@@ -141,29 +150,24 @@ router.get(
   async (req: Request, res: Response) => {
     const taka = await prisma.taka.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
-      include: {
-        firm: { select: { id: true, firmName: true, firmCode: true } },
-        beam: { select: { id: true, beamNo: true, beamQuality: { select: { id: true, name: true } } } },
+      select: {
+        id: true,
+        takaSrNo: true,
+        takaMeter: true,
+        createdAt: true,
+        firm: { select: { firmName: true } },
+        beam: { select: { beamNo: true } },
         productionInfo: {
           select: {
-            id: true,
-            entryDate: true,
             takaNo: true,
-            takaSrNo: true,
-            takaMeter: true,
-            productionQualityId: true,
+            entryDate: true,
             weight: true,
-            remark: true,
-            productionChallanNo: true,
-            millOutvertId: true,
-            millOutvertDate: true,
-            millInvertId: true,
-            millInvertDate: true,
-            millChallanNo: true,
             millName: true,
-            machine: { select: { id: true, machineNo: true, machineType: true } },
-            firm: { select: { id: true, firmName: true, firmCode: true } },
-            productionQuality: { select: { id: true, name: true } },
+            millOutvertDate: true,
+            millInvertDate: true,
+            millInvertId: true,
+            machine: { select: { machineNo: true } },
+            productionQuality: { select: { name: true } },
           },
         },
       },
