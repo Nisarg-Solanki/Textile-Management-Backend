@@ -61,7 +61,18 @@ router.get("/", authMiddleware, async (req: Request, res: Response) => {
 
   const [total, data] = await Promise.all([
     prisma.mill.count({ where }),
-    prisma.mill.findMany({ where, skip, take: limit, orderBy: { createdAt: "desc" } }),
+    prisma.mill.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        millName: true,
+        millCode: true,
+        status: true,
+      },
+    }),
   ]);
 
   res.json({
@@ -138,6 +149,15 @@ router.get("/:id", authMiddleware, async (req: Request, res: Response) => {
 
   const mill = await prisma.mill.findFirst({
     where: { id: req.params.id as string, deletedAt: null },
+    select: {
+      id: true,
+      millName: true,
+      millCode: true,
+      address: true,
+      contactPerson: true,
+      contactNumber: true,
+      status: true,
+    },
   });
   if (!mill) throw new AppError(404, "Mill not found", "MILL_NOT_FOUND");
 

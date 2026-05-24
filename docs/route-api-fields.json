@@ -1,0 +1,1054 @@
+{
+  "$comment": "Auto-generated mapping of dashboard listing/detail routes to the backend APIs and the response fields actually consumed by the UI. Skips /new and /edit pages.",
+  "generatedAt": "2026-05-24",
+  "routes": {
+    "/": {
+      "type": "list",
+      "file": "src/app/(dashboard)/page.tsx",
+      "api": [
+        {
+          "endpoint": "/auth/pending-users",
+          "method": "GET",
+          "apiFile": "src/lib/api/auth.ts",
+          "fieldsUsed": ["pagination.total"]
+        }
+      ]
+    },
+    "/dashboard": {
+      "type": "list",
+      "file": "src/app/(dashboard)/dashboard/page.tsx",
+      "api": [
+        {
+          "endpoint": "/dashboard/stats",
+          "method": "GET",
+          "apiFile": "src/lib/api/dashboard.ts",
+          "fieldsUsed": [
+            "totalBeams.value",
+            "totalBeams.changePercent",
+            "totalBeams.trend",
+            "totalBeams.label",
+            "productionEntries.value",
+            "productionEntries.changePercent",
+            "productionEntries.trend",
+            "productionEntries.label",
+            "pendingTakas.value",
+            "pendingTakas.label",
+            "pendingTakas.requiresAttention"
+          ]
+        },
+        {
+          "endpoint": "/dashboard/production-chart",
+          "method": "GET",
+          "apiFile": "src/lib/api/dashboard.ts",
+          "fieldsUsed": ["points[].label", "points[].value"]
+        }
+      ]
+    },
+    "/firms": {
+      "type": "list",
+      "file": "src/app/(dashboard)/firms/page.tsx",
+      "api": [
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName", "firmCode", "challanEnable", "status"]
+        }
+      ]
+    },
+    "/firms/[id]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/firms/[id]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/firms/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": [
+            "id",
+            "firmName",
+            "firmCode",
+            "challanEnable",
+            "srNoSeries",
+            "address",
+            "contactPerson",
+            "contactNumber",
+            "status"
+          ]
+        }
+      ]
+    },
+    "/mills": {
+      "type": "list",
+      "file": "src/app/(dashboard)/mills/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mills",
+          "method": "GET",
+          "apiFile": "src/lib/api/mills.ts",
+          "fieldsUsed": ["id", "millName", "millCode", "status"]
+        }
+      ]
+    },
+    "/mills/[id]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/mills/[id]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mills/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/mills.ts",
+          "fieldsUsed": [
+            "id",
+            "millName",
+            "millCode",
+            "address",
+            "contactPerson",
+            "contactNumber",
+            "status"
+          ]
+        }
+      ]
+    },
+    "/beam-qualities": {
+      "type": "list",
+      "file": "src/app/(dashboard)/beam-qualities/page.tsx",
+      "api": [
+        {
+          "endpoint": "/beam-qualities",
+          "method": "GET",
+          "apiFile": "src/lib/api/beamQualities.ts",
+          "fieldsUsed": ["id", "name", "status", "createdAt"]
+        }
+      ]
+    },
+    "/production-qualities": {
+      "type": "list",
+      "file": "src/app/(dashboard)/production-qualities/page.tsx",
+      "api": [
+        {
+          "endpoint": "/production-qualities",
+          "method": "GET",
+          "apiFile": "src/lib/api/productionQualities.ts",
+          "fieldsUsed": ["id", "name", "status", "createdAt"]
+        }
+      ]
+    },
+    "/machines": {
+      "type": "list",
+      "file": "src/app/(dashboard)/machines/page.tsx",
+      "api": [
+        {
+          "endpoint": "/machines",
+          "method": "GET",
+          "apiFile": "src/lib/api/machines.ts",
+          "fieldsUsed": [
+            "id",
+            "machineNo",
+            "machineType",
+            "firm.firmName",
+            "status",
+            "remark"
+          ]
+        }
+      ]
+    },
+    "/machines/[id]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/machines/[id]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/machines/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/machines.ts",
+          "fieldsUsed": [
+            "id",
+            "machineNo",
+            "machineType",
+            "firm.firmName",
+            "remark",
+            "status"
+          ]
+        }
+      ]
+    },
+    "/beams": {
+      "type": "list",
+      "file": "src/app/(dashboard)/beams/page.tsx",
+      "api": [
+        {
+          "endpoint": "/beams",
+          "method": "GET",
+          "apiFile": "src/lib/api/beams.ts",
+          "fieldsUsed": [
+            "id",
+            "beamNo",
+            "beamQuality.id",
+            "beamQuality.name",
+            "firm.firmName",
+            "tar",
+            "takaQty",
+            "beamMeter"
+          ]
+        }
+      ]
+    },
+    "/beams/[id]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/beams/[id]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/beams/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/beams.ts",
+          "fieldsUsed": [
+            "id",
+            "beamNo",
+            "firm.firmName",
+            "beamQuality.name",
+            "tar",
+            "takaQty",
+            "beamMeter"
+          ]
+        }
+      ]
+    },
+    "/production": {
+      "type": "list",
+      "file": "src/app/(dashboard)/production/page.tsx",
+      "api": [
+        {
+          "endpoint": "/production",
+          "method": "GET",
+          "apiFile": "src/lib/api/production.ts",
+          "fieldsUsed": [
+            "id",
+            "entryDate",
+            "productionChallanNo",
+            "takaSrNo",
+            "machine.machineNo",
+            "takaNo",
+            "takaMeter",
+            "beam.beamNo",
+            "productionQuality.name",
+            "weight",
+            "remark",
+            "millName",
+            "millOutvertDate",
+            "millInvertDate",
+            "millOutvertId",
+            "millInvertId"
+          ]
+        }
+      ]
+    },
+    "/production/[id]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/production/[id]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/production/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/production.ts",
+          "fieldsUsed": [
+            "id",
+            "entryDate",
+            "productionChallanNo",
+            "takaSrNo",
+            "machine.machineNo",
+            "takaNo",
+            "takaMeter",
+            "beam.beamNo",
+            "productionQuality.name",
+            "weight",
+            "remark",
+            "firm.firmName",
+            "millOutvertDate",
+            "millChallanNo",
+            "millName",
+            "millOutvertId",
+            "millInvertId"
+          ]
+        }
+      ]
+    },
+    "/takas": {
+      "type": "list",
+      "file": "src/app/(dashboard)/takas/page.tsx",
+      "api": [
+        {
+          "endpoint": "/takas",
+          "method": "GET",
+          "apiFile": "src/lib/api/takas.ts",
+          "fieldsUsed": [
+            "id",
+            "takaSrNo",
+            "takaNo",
+            "takaMeter",
+            "beam.beamNo",
+            "firm.firmName",
+            "createdAt",
+            "productionInfo.millOutvertDate",
+            "productionInfo.millInvertId"
+          ]
+        },
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName"]
+        }
+      ]
+    },
+    "/takas/[id]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/takas/[id]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/takas/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/takas.ts",
+          "fieldsUsed": [
+            "id",
+            "takaSrNo",
+            "takaNo",
+            "takaMeter",
+            "beam.beamNo",
+            "firm.firmName",
+            "createdAt",
+            "productionInfo.entryDate",
+            "productionInfo.machine.machineNo",
+            "productionInfo.productionQuality.name",
+            "productionInfo.weight",
+            "productionInfo.millName",
+            "productionInfo.millOutvertDate",
+            "productionInfo.millInvertDate",
+            "productionInfo.millInvertId"
+          ]
+        }
+      ]
+    },
+    "/mill-outverts": {
+      "type": "list",
+      "file": "src/app/(dashboard)/mill-outverts/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mill-outverts",
+          "method": "GET",
+          "apiFile": "src/lib/api/millOutverts.ts",
+          "fieldsUsed": [
+            "id",
+            "outvertDate",
+            "firmChallanNo",
+            "mill.millName",
+            "firm.firmName",
+            "outvertTakas[].length"
+          ]
+        }
+      ]
+    },
+    "/mill-outverts/[id]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/mill-outverts/[id]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mill-outverts/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/millOutverts.ts",
+          "fieldsUsed": [
+            "id",
+            "outvertDate",
+            "firmChallanNo",
+            "mill.millName",
+            "firm.firmName",
+            "outvertTakas[].id",
+            "outvertTakas[].takaSrNo",
+            "outvertTakas[].takaMeter"
+          ]
+        }
+      ]
+    },
+    "/mill-inverts": {
+      "type": "list",
+      "file": "src/app/(dashboard)/mill-inverts/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mill-inverts",
+          "method": "GET",
+          "apiFile": "src/lib/api/millInverts.ts",
+          "fieldsUsed": [
+            "id",
+            "invertDate",
+            "millChallanNo",
+            "firmChallanNo",
+            "mill.millName",
+            "firm.firmName",
+            "invertTakas[].length"
+          ]
+        }
+      ]
+    },
+    "/mill-inverts/[id]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/mill-inverts/[id]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mill-inverts/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/millInverts.ts",
+          "fieldsUsed": [
+            "id",
+            "invertDate",
+            "millChallanNo",
+            "firmChallanNo",
+            "mill.millName",
+            "firm.firmName",
+            "millOutvert.firmChallanNo",
+            "invertTakas[].id",
+            "invertTakas[].takaSrNo",
+            "invertTakas[].takaMeter"
+          ]
+        }
+      ]
+    },
+    "/machine-info": {
+      "type": "list",
+      "file": "src/app/(dashboard)/machine-info/page.tsx",
+      "api": [
+        {
+          "endpoint": "/machine-info",
+          "method": "GET",
+          "apiFile": "src/lib/api/machineInfo.ts",
+          "fieldsUsed": [
+            "id",
+            "firmId",
+            "machineNo",
+            "machineType",
+            "status",
+            "remark",
+            "createdAt",
+            "updatedAt",
+            "firm.id",
+            "firm.firmName",
+            "firm.firmCode",
+            "beams[].id",
+            "beams[].beamNo",
+            "beams[].beamMeter",
+            "beams[].takas[].id",
+            "beams[].takas[].takaSrNo",
+            "beams[].takas[].takaNo",
+            "beams[].takas[].takaMeter"
+          ]
+        }
+      ]
+    },
+    "/mill-summary": {
+      "type": "list",
+      "file": "src/app/(dashboard)/mill-summary/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mill-summary",
+          "method": "GET",
+          "apiFile": "src/lib/api/millSummary.ts",
+          "fieldsUsed": [
+            "firmChallanNo",
+            "firm.id",
+            "firm.firmName",
+            "firm.firmCode",
+            "mill.id",
+            "mill.millName",
+            "mill.millCode",
+            "millOutvertId",
+            "outvertDate",
+            "invertDate",
+            "millChallanNo",
+            "millInvertId",
+            "status",
+            "takaCount",
+            "productions[].id",
+            "productions[].takaSrNo",
+            "productions[].takaMeter",
+            "productions[].entryDate",
+            "productions[].weight",
+            "productions[].remark",
+            "productions[].productionChallanNo",
+            "productions[].millOutvertId",
+            "productions[].millOutvertDate",
+            "productions[].millInvertId",
+            "productions[].millChallanNo",
+            "productions[].millName",
+            "productions[].machine.id",
+            "productions[].machine.machineNo",
+            "productions[].machine.machineType",
+            "productions[].beam.id",
+            "productions[].beam.beamNo",
+            "productions[].beam.beamMeter",
+            "productions[].beam.beamQuality.id",
+            "productions[].beam.beamQuality.name",
+            "productions[].productionQuality.id",
+            "productions[].productionQuality.name",
+            "productions[].millOutvert.id",
+            "productions[].millOutvert.firmChallanNo",
+            "productions[].millOutvert.outvertDate",
+            "productions[].millInvert.id",
+            "productions[].millInvert.millChallanNo",
+            "productions[].millInvert.invertDate",
+            "productions[].taka.id"
+          ]
+        }
+      ]
+    },
+    "/admin/users": {
+      "type": "list",
+      "file": "src/app/(dashboard)/admin/users/page.tsx",
+      "api": [
+        {
+          "endpoint": "/auth/users",
+          "method": "GET",
+          "apiFile": "src/lib/api/auth.ts",
+          "fieldsUsed": ["id", "name", "email", "role", "status", "createdAt"]
+        }
+      ]
+    },
+    "/admin/pending-users": {
+      "type": "list",
+      "file": "src/app/(dashboard)/admin/pending-users/page.tsx",
+      "api": [
+        {
+          "endpoint": "/auth/pending-users",
+          "method": "GET",
+          "apiFile": "src/lib/api/auth.ts",
+          "fieldsUsed": ["id", "name", "email", "status", "createdAt"]
+        }
+      ]
+    },
+    "/admin/permissions/[userId]": {
+      "type": "detail",
+      "file": "src/app/(dashboard)/admin/permissions/[userId]/page.tsx",
+      "api": [
+        {
+          "endpoint": "/permissions/{userId}",
+          "method": "GET",
+          "apiFile": "src/lib/api/permissions.ts",
+          "fieldsUsed": [
+            "permissions[].id",
+            "permissions[].module",
+            "permissions[].action",
+            "permissions[].granted"
+          ]
+        }
+      ]
+    },
+    "/firms/new": {
+      "type": "create",
+      "file": "src/app/(dashboard)/firms/new/page.tsx",
+      "api": [
+        {
+          "endpoint": "/firms",
+          "method": "POST",
+          "apiFile": "src/lib/actions/firms.actions.ts",
+          "fieldsUsed": [
+            "firmName",
+            "firmCode",
+            "challanEnable",
+            "srNoSeries",
+            "address",
+            "contactPerson",
+            "contactNumber"
+          ]
+        }
+      ]
+    },
+    "/firms/[id]/edit": {
+      "type": "edit",
+      "file": "src/app/(dashboard)/firms/[id]/edit/page.tsx",
+      "api": [
+        {
+          "endpoint": "/firms/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": [
+            "firmName",
+            "firmCode",
+            "challanEnable",
+            "srNoSeries",
+            "address",
+            "contactPerson",
+            "contactNumber"
+          ]
+        },
+        {
+          "endpoint": "/firms/{id}",
+          "method": "PUT",
+          "apiFile": "src/lib/actions/firms.actions.ts",
+          "fieldsUsed": [
+            "firmName",
+            "firmCode",
+            "challanEnable",
+            "srNoSeries",
+            "address",
+            "contactPerson",
+            "contactNumber"
+          ]
+        }
+      ]
+    },
+    "/mills/new": {
+      "type": "create",
+      "file": "src/app/(dashboard)/mills/new/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mills",
+          "method": "POST",
+          "apiFile": "src/lib/actions/mills.actions.ts",
+          "fieldsUsed": [
+            "millName",
+            "millCode",
+            "address",
+            "contactPerson",
+            "contactNumber"
+          ]
+        }
+      ]
+    },
+    "/mills/[id]/edit": {
+      "type": "edit",
+      "file": "src/app/(dashboard)/mills/[id]/edit/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mills/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/mills.ts",
+          "fieldsUsed": [
+            "millName",
+            "millCode",
+            "address",
+            "contactPerson",
+            "contactNumber"
+          ]
+        },
+        {
+          "endpoint": "/mills/{id}",
+          "method": "PUT",
+          "apiFile": "src/lib/actions/mills.actions.ts",
+          "fieldsUsed": [
+            "millName",
+            "millCode",
+            "address",
+            "contactPerson",
+            "contactNumber"
+          ]
+        }
+      ]
+    },
+    "/machines/new": {
+      "type": "create",
+      "file": "src/app/(dashboard)/machines/new/page.tsx",
+      "api": [
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName"],
+          "note": "Lookup for Firm dropdown"
+        },
+        {
+          "endpoint": "/machines",
+          "method": "POST",
+          "apiFile": "src/lib/actions/machines.actions.ts",
+          "fieldsUsed": ["firmId", "machineNo", "machineType", "remark", "status"]
+        }
+      ]
+    },
+    "/machines/[id]/edit": {
+      "type": "edit",
+      "file": "src/app/(dashboard)/machines/[id]/edit/page.tsx",
+      "api": [
+        {
+          "endpoint": "/machines/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/machines.ts",
+          "fieldsUsed": ["firmId", "machineNo", "machineType", "remark", "status"]
+        },
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName"],
+          "note": "Lookup for Firm dropdown"
+        },
+        {
+          "endpoint": "/machines/{id}",
+          "method": "PUT",
+          "apiFile": "src/lib/actions/machines.actions.ts",
+          "fieldsUsed": ["firmId", "machineNo", "machineType", "remark", "status"]
+        }
+      ]
+    },
+    "/beams/new": {
+      "type": "create",
+      "file": "src/app/(dashboard)/beams/new/page.tsx",
+      "api": [
+        {
+          "endpoint": "/beam-qualities",
+          "method": "GET",
+          "apiFile": "src/lib/api/beamQualities.ts",
+          "fieldsUsed": ["id", "name"],
+          "note": "Lookup for Beam Quality dropdown"
+        },
+        {
+          "endpoint": "/beams",
+          "method": "POST",
+          "apiFile": "src/lib/actions/beams.actions.ts",
+          "fieldsUsed": ["beamNo", "tar", "beamQualityId", "takaQty", "beamMeter"]
+        },
+        {
+          "endpoint": "/beam-qualities",
+          "method": "POST",
+          "apiFile": "src/lib/api/beamQualities.ts",
+          "fieldsUsed": ["name"],
+          "note": "Inline-create dialog when user clicks + add button in Beam Quality dropdown"
+        }
+      ]
+    },
+    "/beams/[id]/edit": {
+      "type": "edit",
+      "file": "src/app/(dashboard)/beams/[id]/edit/page.tsx",
+      "api": [
+        {
+          "endpoint": "/beams/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/beams.ts",
+          "fieldsUsed": ["beamNo", "tar", "beamQualityId", "takaQty", "beamMeter"]
+        },
+        {
+          "endpoint": "/beam-qualities",
+          "method": "GET",
+          "apiFile": "src/lib/api/beamQualities.ts",
+          "fieldsUsed": ["id", "name"],
+          "note": "Lookup for Beam Quality dropdown"
+        },
+        {
+          "endpoint": "/beams/{id}",
+          "method": "PUT",
+          "apiFile": "src/lib/actions/beams.actions.ts",
+          "fieldsUsed": ["beamNo", "tar", "beamQualityId", "takaQty", "beamMeter"]
+        },
+        {
+          "endpoint": "/beam-qualities",
+          "method": "POST",
+          "apiFile": "src/lib/api/beamQualities.ts",
+          "fieldsUsed": ["name"],
+          "note": "Inline-create dialog when user clicks + add button in Beam Quality dropdown"
+        }
+      ]
+    },
+    "/production/new": {
+      "type": "create",
+      "file": "src/app/(dashboard)/production/new/page.tsx",
+      "api": [
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName", "challanEnable"],
+          "note": "Lookup for Firm dropdown; challanEnable drives conditional Challan No field"
+        },
+        {
+          "endpoint": "/machines",
+          "method": "GET",
+          "apiFile": "src/lib/api/machines.ts",
+          "fieldsUsed": ["id", "machineNo"],
+          "note": "Lookup for Machine dropdown — filtered by selected firmId"
+        },
+        {
+          "endpoint": "/beams",
+          "method": "GET",
+          "apiFile": "src/lib/api/beams.ts",
+          "fieldsUsed": ["id", "beamNo"],
+          "note": "Lookup for Beam dropdown"
+        },
+        {
+          "endpoint": "/production-qualities",
+          "method": "GET",
+          "apiFile": "src/lib/api/productionQualities.ts",
+          "fieldsUsed": ["id", "name"],
+          "note": "Lookup for Production Quality dropdown"
+        },
+        {
+          "endpoint": "/production",
+          "method": "POST",
+          "apiFile": "src/lib/actions/production.actions.ts",
+          "fieldsUsed": [
+            "firmId",
+            "machineId",
+            "beamId",
+            "entryDate",
+            "takaSrNo",
+            "takaNo",
+            "takaMeter",
+            "productionQualityId",
+            "weight",
+            "remark",
+            "productionChallanNo"
+          ]
+        },
+        {
+          "endpoint": "/production-qualities",
+          "method": "POST",
+          "apiFile": "src/lib/api/productionQualities.ts",
+          "fieldsUsed": ["name"],
+          "note": "Inline-create dialog when user clicks + add button in Production Quality dropdown"
+        }
+      ]
+    },
+    "/production/[id]/edit": {
+      "type": "edit",
+      "file": "src/app/(dashboard)/production/[id]/edit/page.tsx",
+      "api": [
+        {
+          "endpoint": "/production/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/production.ts",
+          "fieldsUsed": [
+            "firmId",
+            "machineId",
+            "beamId",
+            "entryDate",
+            "takaSrNo",
+            "takaNo",
+            "takaMeter",
+            "productionQualityId",
+            "weight",
+            "remark",
+            "productionChallanNo",
+            "millOutvertDate",
+            "millChallanNo",
+            "millName"
+          ]
+        },
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName", "challanEnable"],
+          "note": "Lookup for Firm dropdown; challanEnable drives conditional Challan No field"
+        },
+        {
+          "endpoint": "/machines",
+          "method": "GET",
+          "apiFile": "src/lib/api/machines.ts",
+          "fieldsUsed": ["id", "machineNo"],
+          "note": "Lookup for Machine dropdown — filtered by selected firmId"
+        },
+        {
+          "endpoint": "/beams",
+          "method": "GET",
+          "apiFile": "src/lib/api/beams.ts",
+          "fieldsUsed": ["id", "beamNo"],
+          "note": "Lookup for Beam dropdown"
+        },
+        {
+          "endpoint": "/production-qualities",
+          "method": "GET",
+          "apiFile": "src/lib/api/productionQualities.ts",
+          "fieldsUsed": ["id", "name"],
+          "note": "Lookup for Production Quality dropdown"
+        },
+        {
+          "endpoint": "/production/{id}",
+          "method": "PUT",
+          "apiFile": "src/lib/actions/production.actions.ts",
+          "fieldsUsed": [
+            "firmId",
+            "machineId",
+            "beamId",
+            "entryDate",
+            "takaSrNo",
+            "takaNo",
+            "takaMeter",
+            "productionQualityId",
+            "weight",
+            "remark",
+            "productionChallanNo"
+          ]
+        },
+        {
+          "endpoint": "/production-qualities",
+          "method": "POST",
+          "apiFile": "src/lib/api/productionQualities.ts",
+          "fieldsUsed": ["name"],
+          "note": "Inline-create dialog when user clicks + add button in Production Quality dropdown"
+        }
+      ]
+    },
+    "/mill-outverts/new": {
+      "type": "create",
+      "file": "src/app/(dashboard)/mill-outverts/new/page.tsx",
+      "api": [
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName"],
+          "note": "Lookup for Firm dropdown"
+        },
+        {
+          "endpoint": "/mills",
+          "method": "GET",
+          "apiFile": "src/lib/api/mills.ts",
+          "fieldsUsed": ["id", "millName"],
+          "note": "Lookup for Mill dropdown"
+        },
+        {
+          "endpoint": "/takas",
+          "method": "GET",
+          "apiFile": "src/lib/api/takas.ts",
+          "fieldsUsed": ["id", "takaSrNo"],
+          "note": "Lookup for Taka Sr No multi-select — filtered by selected firmId"
+        },
+        {
+          "endpoint": "/mill-outverts",
+          "method": "POST",
+          "apiFile": "src/lib/actions/millOutverts.actions.ts",
+          "fieldsUsed": ["firmId", "millId", "outvertDate", "firmChallanNo", "takaSrNos"]
+        }
+      ]
+    },
+    "/mill-outverts/[id]/edit": {
+      "type": "edit",
+      "file": "src/app/(dashboard)/mill-outverts/[id]/edit/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mill-outverts/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/millOutverts.ts",
+          "fieldsUsed": ["firmId", "millId", "outvertDate", "firmChallanNo", "outvertTakas"]
+        },
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName"],
+          "note": "Lookup for Firm dropdown"
+        },
+        {
+          "endpoint": "/mills",
+          "method": "GET",
+          "apiFile": "src/lib/api/mills.ts",
+          "fieldsUsed": ["id", "millName"],
+          "note": "Lookup for Mill dropdown"
+        },
+        {
+          "endpoint": "/takas",
+          "method": "GET",
+          "apiFile": "src/lib/api/takas.ts",
+          "fieldsUsed": ["id", "takaSrNo"],
+          "note": "Lookup for Taka Sr No multi-select — filtered by selected firmId"
+        },
+        {
+          "endpoint": "/mill-outverts/{id}",
+          "method": "PUT",
+          "apiFile": "src/lib/actions/millOutverts.actions.ts",
+          "fieldsUsed": ["firmId", "millId", "outvertDate", "firmChallanNo", "takaSrNos"]
+        }
+      ]
+    },
+    "/mill-inverts/new": {
+      "type": "create",
+      "file": "src/app/(dashboard)/mill-inverts/new/page.tsx",
+      "api": [
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName"],
+          "note": "Lookup for Firm dropdown"
+        },
+        {
+          "endpoint": "/mills",
+          "method": "GET",
+          "apiFile": "src/lib/api/mills.ts",
+          "fieldsUsed": ["id", "millName"],
+          "note": "Lookup for Mill dropdown"
+        },
+        {
+          "endpoint": "/mill-outverts",
+          "method": "GET",
+          "apiFile": "src/lib/api/millOutverts.ts",
+          "fieldsUsed": ["id", "firmChallanNo", "outvertTakas"],
+          "note": "Lookup for Outvert Challan dropdown — filtered by selected firmId; outvertTakas drives Taka Sr No options"
+        },
+        {
+          "endpoint": "/mill-inverts",
+          "method": "POST",
+          "apiFile": "src/lib/actions/millInverts.actions.ts",
+          "fieldsUsed": [
+            "firmId",
+            "millId",
+            "millOutvertId",
+            "invertDate",
+            "millChallanNo",
+            "firmChallanNo",
+            "takaSrNos"
+          ]
+        }
+      ]
+    },
+    "/mill-inverts/[id]/edit": {
+      "type": "edit",
+      "file": "src/app/(dashboard)/mill-inverts/[id]/edit/page.tsx",
+      "api": [
+        {
+          "endpoint": "/mill-inverts/{id}",
+          "method": "GET",
+          "apiFile": "src/lib/api/millInverts.ts",
+          "fieldsUsed": [
+            "firmId",
+            "millId",
+            "millOutvertId",
+            "invertDate",
+            "millChallanNo",
+            "firmChallanNo",
+            "invertTakas"
+          ]
+        },
+        {
+          "endpoint": "/firms",
+          "method": "GET",
+          "apiFile": "src/lib/api/firms.ts",
+          "fieldsUsed": ["id", "firmName"],
+          "note": "Lookup for Firm dropdown"
+        },
+        {
+          "endpoint": "/mills",
+          "method": "GET",
+          "apiFile": "src/lib/api/mills.ts",
+          "fieldsUsed": ["id", "millName"],
+          "note": "Lookup for Mill dropdown"
+        },
+        {
+          "endpoint": "/mill-outverts",
+          "method": "GET",
+          "apiFile": "src/lib/api/millOutverts.ts",
+          "fieldsUsed": ["id", "firmChallanNo", "outvertTakas"],
+          "note": "Lookup for Outvert Challan dropdown — filtered by selected firmId; outvertTakas drives Taka Sr No options"
+        },
+        {
+          "endpoint": "/mill-inverts/{id}",
+          "method": "PUT",
+          "apiFile": "src/lib/actions/millInverts.actions.ts",
+          "fieldsUsed": [
+            "firmId",
+            "millId",
+            "millOutvertId",
+            "invertDate",
+            "millChallanNo",
+            "firmChallanNo",
+            "takaSrNos"
+          ]
+        }
+      ]
+    }
+  }
+}

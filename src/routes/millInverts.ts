@@ -96,11 +96,14 @@ router.get(
         skip,
         take: limit,
         orderBy: { invertDate: "desc" },
-        include: {
-          firm: { select: { id: true, firmName: true, firmCode: true } },
-          mill: { select: { id: true, millName: true, millCode: true } },
-          millOutvert: { select: { id: true, firmChallanNo: true, outvertDate: true } },
-          invertTakas: { select: { id: true, takaSrNo: true } },
+        select: {
+          id: true,
+          invertDate: true,
+          millChallanNo: true,
+          firmChallanNo: true,
+          firm: { select: { firmName: true } },
+          mill: { select: { millName: true } },
+          invertTakas: { select: { id: true } },
         },
       }),
     ]);
@@ -139,23 +142,18 @@ router.get(
   async (req: Request, res: Response) => {
     const invert = await prisma.millInvert.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
-      include: {
-        firm: { select: { id: true, firmName: true, firmCode: true } },
-        mill: { select: { id: true, millName: true, millCode: true } },
-        millOutvert: { select: { id: true, firmChallanNo: true, outvertDate: true } },
+      select: {
+        id: true,
+        firmId: true,
+        millId: true,
+        millOutvertId: true,
+        invertDate: true,
+        millChallanNo: true,
+        firmChallanNo: true,
+        firm: { select: { firmName: true } },
+        mill: { select: { millName: true } },
+        millOutvert: { select: { firmChallanNo: true } },
         invertTakas: { select: { id: true, takaSrNo: true } },
-        productionInfos: {
-          where: { deletedAt: null },
-          select: {
-            id: true,
-            takaSrNo: true,
-            takaMeter: true,
-            productionQuality: true,
-            entryDate: true,
-            millChallanNo: true,
-            millName: true,
-          },
-        },
       },
     });
     if (!invert) {

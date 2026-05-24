@@ -101,35 +101,33 @@ router.get(
       }),
     };
 
-    const [total, rawList] = await Promise.all([
+    const [total, data] = await Promise.all([
       prisma.productionInfo.count({ where }),
       prisma.productionInfo.findMany({
         where,
         skip,
         take: limit,
         orderBy: { entryDate: "desc" },
-        include: {
-          firm: { select: { id: true, firmName: true, firmCode: true } },
-          machine: { select: { id: true, machineNo: true, machineType: true } },
-          beam: {
-            select: {
-              id: true,
-              beamNo: true,
-              beamQuality: { select: { id: true, name: true } },
-            },
-          },
-          taka: { select: { id: true, takaSrNo: true, takaMeter: true } },
-          productionQuality: { select: { id: true, name: true } },
-          millOutvert: { select: { id: true, firmChallanNo: true, outvertDate: true } },
-          millInvert: { select: { id: true, millChallanNo: true, invertDate: true } },
+        select: {
+          id: true,
+          entryDate: true,
+          productionChallanNo: true,
+          takaSrNo: true,
+          takaNo: true,
+          takaMeter: true,
+          weight: true,
+          remark: true,
+          millName: true,
+          millOutvertDate: true,
+          millInvertDate: true,
+          millOutvertId: true,
+          millInvertId: true,
+          machine: { select: { machineNo: true } },
+          beam: { select: { beamNo: true } },
+          productionQuality: { select: { name: true } },
         },
       }),
     ]);
-
-    const data = rawList.map((r) => ({
-      ...r,
-      taka: r.taka ? { ...r.taka, takaNo: r.takaNo } : null,
-    }));
 
     res.json({
       success: true,
@@ -165,34 +163,35 @@ router.get(
   async (req: Request, res: Response) => {
     const record = await prisma.productionInfo.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
-      include: {
-        firm: { select: { id: true, firmName: true, firmCode: true } },
-        machine: { select: { id: true, machineNo: true, machineType: true } },
-        beam: {
-          select: {
-            id: true,
-            beamNo: true,
-            beamMeter: true,
-            beamQuality: { select: { id: true, name: true } },
-          },
-        },
-        taka: { select: { id: true, takaSrNo: true, takaMeter: true, createdAt: true } },
-        productionQuality: { select: { id: true, name: true } },
-        millOutvert: { select: { id: true, firmChallanNo: true, outvertDate: true } },
-        millInvert: { select: { id: true, millChallanNo: true, invertDate: true } },
+      select: {
+        id: true,
+        firmId: true,
+        machineId: true,
+        beamId: true,
+        entryDate: true,
+        takaSrNo: true,
+        takaNo: true,
+        takaMeter: true,
+        productionQualityId: true,
+        weight: true,
+        remark: true,
+        productionChallanNo: true,
+        millOutvertDate: true,
+        millChallanNo: true,
+        millName: true,
+        millOutvertId: true,
+        millInvertId: true,
+        firm: { select: { firmName: true } },
+        machine: { select: { machineNo: true } },
+        beam: { select: { beamNo: true } },
+        productionQuality: { select: { name: true } },
       },
     });
     if (!record) {
       throw new AppError(404, "Production record not found", "PRODUCTION_NOT_FOUND");
     }
 
-    res.json({
-      success: true,
-      data: {
-        ...record,
-        taka: record.taka ? { ...record.taka, takaNo: record.takaNo } : null,
-      },
-    });
+    res.json({ success: true, data: record });
   },
 );
 

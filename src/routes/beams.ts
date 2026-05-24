@@ -71,8 +71,13 @@ router.get(
     };
 
     const beamSelect = {
-      include: {
-        firm: { select: { id: true, firmName: true, firmCode: true } },
+      select: {
+        id: true,
+        beamNo: true,
+        tar: true,
+        takaQty: true,
+        beamMeter: true,
+        firm: { select: { firmName: true } },
         beamQuality: { select: { id: true, name: true } },
       },
     } as const;
@@ -138,9 +143,15 @@ router.get(
   async (req: Request, res: Response) => {
     const beam = await prisma.beam.findFirst({
       where: { id: req.params.id as string, deletedAt: null },
-      include: {
-        firm: { select: { id: true, firmName: true, firmCode: true } },
-        beamQuality: { select: { id: true, name: true } },
+      select: {
+        id: true,
+        beamNo: true,
+        beamQualityId: true,
+        tar: true,
+        takaQty: true,
+        beamMeter: true,
+        firm: { select: { firmName: true } },
+        beamQuality: { select: { name: true } },
       },
     });
     if (!beam) throw new AppError(404, "Beam not found", "BEAM_NOT_FOUND");

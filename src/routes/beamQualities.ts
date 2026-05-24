@@ -67,6 +67,12 @@ router.get(
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          createdAt: true,
+        },
       }),
     ]);
 
