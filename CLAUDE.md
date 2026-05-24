@@ -11,6 +11,7 @@ A textile production management system. Firms manage beams, production records,
 taka (fabric rolls), mill dispatch/receipt operations, and machine status tracking.
 
 **Roles:** Two roles only — `super_admin` and `admin`.
+
 - `super_admin` — identified by `SUPER_ADMIN_EMAILS` env var; approves/rejects new admin registrations; assigns module-level permissions to each admin; has full access to everything.
 - `admin` — registered and approved by super_admin; access is limited to the modules and actions (view/create/edit/delete) that super_admin has explicitly granted.
 
@@ -44,29 +45,34 @@ Data records (machines, beams, production, etc.) still carry a `firmId` as a dat
 ```
 backend/
 ├── src/
-│   ├── index.ts               # App entry point — starts Express server
-│   ├── app.ts                 # Express app setup — middleware, routes mounted here
+│   ├── index.ts               # App entry point — starts Express server, loads dotenv
+│   ├── app.ts                 # Express app setup — middleware, routes, swagger mounted here
 │   ├── middleware/
 │   │   ├── auth.ts            # JWT verification — attaches req.user to every protected request
 │   │   └── permission.ts      # requirePermission(module, action) — super_admin bypasses; admin checks AdminPermission
+│   ├── types/
+│   │   └── express.d.ts       # Augments Express.Request with `user?: { userId, role, email }`
 │   ├── routes/
 │   │   ├── auth.ts            # POST /api/v1/auth/login, /refresh, /logout, /register,
-│   │   │                      # /forgot-password, /reset-password, /users (super_admin),
+│   │   │                      # /forgot-password, /reset-password,
+│   │   │                      # GET /users, POST /users (super_admin),
 │   │   │                      # GET /pending-users (super_admin),
 │   │   │                      # POST /approve-user/:id, /reject-user/:id (super_admin)
-│   │   ├── firms.ts           # CRUD for firms (super_admin only)
-│   │   ├── mills.ts           # CRUD for mills (super_admin only)
+│   │   ├── firms.ts           # CRUD for firms — GET open to all auth'd users; POST/PUT/DELETE super_admin-only via assertSuperAdmin()
+│   │   ├── mills.ts           # CRUD for mills — same pattern as firms (assertSuperAdmin in handler, no requirePermission)
 │   │   ├── beamQualities.ts   # CRUD for beam_qualities — /api/v1/beam-qualities
 │   │   ├── productionQualities.ts # CRUD for production_qualities — /api/v1/production-qualities
 │   │   ├── machines.ts        # CRUD for machines — /api/v1/machines
-│   │   ├── beams.ts           # CRUD for beams — /api/v1/beams
-│   │   ├── production.ts      # CRUD for production_info — /api/v1/production
+│   │   ├── beams.ts           # CRUD for beams — /api/v1/beams (supports ?getAll=true for unpaginated)
+│   │   ├── production.ts      # CRUD for production_info — /api/v1/production (delegates writes to service)
 │   │   ├── takas.ts           # GET only (view) — /api/v1/takas
-│   │   ├── millOutverts.ts    # CRUD for mill_outverts — /api/v1/mill-outverts
-│   │   ├── millInverts.ts     # CRUD for mill_inverts — /api/v1/mill-inverts
+│   │   ├── millOutverts.ts    # CRUD for mill_outverts — /api/v1/mill-outverts (delegates to service)
+│   │   ├── millInverts.ts     # CRUD for mill_inverts — /api/v1/mill-inverts (delegates to service)
 │   │   ├── machineInfo.ts     # GET only (view) — /api/v1/machine-info
-│   │   ├── millSummary.ts     # GET only (view) — /api/v1/mill-summary
-│   │   └── permissions.ts     # GET/PUT /api/v1/permissions/:adminId (super_admin only)
+│   │   ├── millSummary.ts     # GET only (view) — /api/v1/mill-summary (grouped by firm challan)
+│   │   ├── dashboard.ts       # GET /api/v1/dashboard/stats, /production-chart
+│   │   └── permissions.ts     # GET /api/v1/permissions/:adminId (super_admin or self),
+│   │                          # PUT /api/v1/permissions/:adminId (super_admin only)
 │   ├── schemas/
 │   │   ├── auth.schema.ts
 │   │   ├── firm.schema.ts
@@ -78,19 +84,21 @@ backend/
 │   │   ├── production.schema.ts
 │   │   ├── millOutvert.schema.ts
 │   │   ├── millInvert.schema.ts
+│   │   ├── dashboard.schema.ts
 │   │   └── permission.schema.ts
 │   ├── services/
-│   │   ├── production.service.ts   # Business logic for production + taka atomic writes
+│   │   ├── production.service.ts   # createProductionEntry / updateProductionEntry — atomic ProductionInfo+Taka writes
 │   │   │                           # Defines productionInclude const + ProductionWithRelations type
-│   │   │                           # createProductionEntry / updateProductionEntry return enriched object
-│   │   ├── millOutvert.service.ts  # Business logic for outvert + production sync
+│   │   │                           # Also enforces takaNo unique per beam, total taka meter ≤ beam meter,
+│   │   │                           # and auto-fills Beam.firmId on first production use
+│   │   ├── millOutvert.service.ts  # createMillOutvert / updateMillOutvert / deleteMillOutvert
 │   │   │                           # Defines millOutvertInclude const + MillOutvertWithRelations type
-│   │   └── millInvert.service.ts   # Business logic for invert + production sync
+│   │   └── millInvert.service.ts   # createMillInvert / updateMillInvert / deleteMillInvert
 │   │                               # Defines millInvertInclude const + MillInvertWithRelations type
 │   ├── lib/
-│   │   ├── prisma.ts          # Prisma client singleton — import this everywhere
-│   │   ├── jwt.ts             # signToken, verifyToken helpers
-│   │   ├── errors.ts          # AppError class + error handler middleware
+│   │   ├── prisma.ts          # Prisma client singleton — uses PrismaPg adapter; cached on globalThis in dev
+│   │   ├── jwt.ts             # signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken
+│   │   ├── errors.ts          # AppError class + global errorHandler (handles AppError, ZodError, Prisma P2002/P2025)
 │   │   ├── mailer.ts          # nodemailer — sendApprovalRequestEmail, sendPasswordResetEmail, sendAccountApprovedEmail
 │   │   └── superAdmin.ts      # getSuperAdminEmails(), isSuperAdminEmail() — reads SUPER_ADMIN_EMAILS env var
 │   └── tests/
@@ -112,13 +120,19 @@ backend/
 │       └── takas.test.ts
 ├── prisma/
 │   ├── schema.prisma
-│   └── migrations/
+│   ├── seed.ts                # Seed script — run via `npx prisma db seed`
+│   └── migrations/            # Includes a partial-unique-indexes migration that replaces
+│                              # most `@unique`/`@@unique` constraints with `CREATE UNIQUE INDEX ...
+│                              # WHERE "deletedAt" IS NULL` so soft-deleted rows don't block recreation
+├── e2e-setup.mjs              # End-to-end test setup helper
+├── e2e-run.mjs                # End-to-end test runner
 ├── prisma.config.ts           # Prisma v7 datasource config — DATABASE_URL lives here
 ├── jest.config.ts             # Jest config — ts-jest preset, points to tsconfig.test.json
 ├── eslint.config.mjs          # ESLint flat config — TypeScript rules
 ├── .env
 ├── .env.example
 ├── tsconfig.json              # Production/dev TypeScript config — module: NodeNext
+├── tsconfig.seed.json         # Seed script override — CommonJS for ts-node compatibility
 ├── tsconfig.test.json         # Test-only overrides — module: CommonJS (required by Jest)
 └── package.json
 ```
@@ -168,6 +182,16 @@ FRONTEND_URL="http://localhost:3000"
 
 ## 5. Prisma Schema (Full)
 
+> **Uniqueness note:** Most "unique" fields below are NOT enforced via `@unique`/`@@unique` in the
+> Prisma schema. They are enforced via **partial unique indexes** created in a raw-SQL migration
+> (`20260522180000_partial_unique_indexes_for_soft_delete`) — `CREATE UNIQUE INDEX ... WHERE
+"deletedAt" IS NULL`. This lets a soft-deleted row coexist with a fresh record of the same
+> value. The Prisma schema comments call this out per field.
+>
+> **Consequence for service code:** never rely on a Prisma unique-constraint violation to detect
+> a duplicate — always pre-check with `findFirst({ where: { ..., deletedAt: null } })`. The
+> P2002 fallback in `errors.ts` is a safety net, not the primary path.
+
 ```prisma
 // prisma/schema.prisma
 
@@ -181,18 +205,19 @@ datasource db {
 }
 
 model Firm {
-  id              String    @id @default(uuid())
-  firmName        String    @unique
-  firmCode        String    @unique
-  challanEnable   Boolean   @default(false)
-  srNoSeries      String?
-  address         String?
-  contactPerson   String?
-  contactNumber   String?
-  status          String    @default("active")   // "active" | "inactive"
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id            String    @id @default(uuid())
+  // firmName / firmCode uniqueness enforced via partial unique indexes (WHERE deletedAt IS NULL)
+  firmName      String
+  firmCode      String
+  challanEnable Boolean   @default(false)
+  srNoSeries    String?
+  address       String?
+  contactPerson String?
+  contactNumber String?
+  status        String    @default("active")   // "active" | "inactive"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   machines        Machine[]
   beams           Beam[]
@@ -201,15 +226,16 @@ model Firm {
   millOutverts    MillOutvert[]
   millInverts     MillInvert[]
 
-  @@index([status])                      // filter active/inactive firms
-  @@index([deletedAt])                   // soft-delete filter
+  @@index([status])
+  @@index([deletedAt])
   @@map("firms")
 }
 
 model Mill {
   id            String    @id @default(uuid())
-  millName      String    @unique
-  millCode      String?   @unique
+  // millName / millCode uniqueness enforced via partial unique indexes
+  millName      String
+  millCode      String?
   address       String?
   contactPerson String?
   contactNumber String?
@@ -221,7 +247,7 @@ model Mill {
   millOutverts  MillOutvert[]
   millInverts   MillInvert[]
 
-  @@index([status])                      // filter active/inactive mills
+  @@index([status])
   @@index([deletedAt])
   @@map("mills")
 }
@@ -240,7 +266,7 @@ model Machine {
   firm             Firm             @relation(fields: [firmId], references: [id])
   productionInfos  ProductionInfo[]
 
-  @@unique([firmId, machineNo])
+  // (firmId, machineNo) uniqueness enforced via partial unique index
   @@index([firmId])                      // firm-scope filter
   @@index([firmId, status])              // list active machines per firm
   @@index([firmId, deletedAt])
@@ -249,7 +275,8 @@ model Machine {
 
 model BeamQuality {
   id          String    @id @default(uuid())
-  name        String    @unique                        // e.g. "60s", "40s/2" — unique globally
+  // name uniqueness enforced via partial unique index (global among non-deleted rows)
+  name        String
   status      String    @default("active")             // "active" | "inactive"
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -263,32 +290,32 @@ model BeamQuality {
 }
 
 model Beam {
-  id              String    @id @default(uuid())
-  firmId          String
-  beamNo          String
-  tar             Int
-  beamQualityId   String                               // FK → BeamQuality.id
-  takaQty         Int
-  beamMeter       Decimal   @db.Decimal(10, 2)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  deletedAt       DateTime?
+  id            String    @id @default(uuid())
+  firmId        String?                              // Nullable — auto-filled from first production entry, not at creation
+  beamNo        String
+  tar           Int
+  beamQualityId String                               // FK → BeamQuality.id
+  takaQty       Int
+  beamMeter     Decimal   @db.Decimal(10, 2)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
-  firm            Firm             @relation(fields: [firmId], references: [id])
+  firm            Firm?            @relation(fields: [firmId], references: [id])
   beamQuality     BeamQuality      @relation(fields: [beamQualityId], references: [id])
   productionInfos ProductionInfo[]
   takas           Taka[]
 
-  @@unique([firmId, beamNo])
-  @@index([firmId])                      // firm-scope filter on every list query
-  @@index([firmId, beamQualityId])       // filter by quality within a firm
-  @@index([firmId, deletedAt])           // soft-delete filter performance
+  // beamNo uniqueness enforced via partial unique index (global among non-deleted rows)
+  @@index([beamQualityId])
+  @@index([deletedAt])
   @@map("beams")
 }
 
 model ProductionQuality {
   id              String    @id @default(uuid())
-  name            String    @unique                      // e.g. "Plain", "Twill" — unique globally
+  // name uniqueness enforced via partial unique index (global among non-deleted rows)
+  name            String
   status          String    @default("active")           // "active" | "inactive"
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -307,16 +334,18 @@ model ProductionInfo {
   machineId               String
   beamId                  String
   entryDate               DateTime
+  takaNo                  String?                        // Unique within the beam; can repeat across beams
   takaSrNo                String
   takaMeter               Decimal   @db.Decimal(10, 2)
   productionQualityId     String                         // FK → ProductionQuality.id
   weight                  Decimal   @db.Decimal(10, 2)
   remark                  String?
-  productionChallanNo     String?                        // Only set if firm.challanEnable = true
+  productionChallanNo     String?                        // Only set if firm.challanEnable = true — NOT unique
   millOutvertId           String?
   millInvertId            String?
   // Auto-filled from mill operations — never set directly by user
   millOutvertDate         DateTime?
+  millInvertDate          DateTime?                      // Set when an invert links this production row
   millChallanNo           String?                        // From mill_inverts.millChallanNo
   millName                String?
   createdAt               DateTime  @default(now())
@@ -331,16 +360,16 @@ model ProductionInfo {
   millInvert         MillInvert?       @relation(fields: [millInvertId], references: [id])
   taka               Taka?
 
-  @@unique([firmId, takaSrNo])
-  @@unique([firmId, productionChallanNo])
-  @@index([firmId])                                       // firm-scope on all list queries
-  @@index([firmId, entryDate])                            // date range filter (most common filter)
-  @@index([firmId, machineId])                            // machine-info view — latest entry per machine
-  @@index([firmId, beamId])                               // filter by beam
-  @@index([firmId, productionQualityId])                  // filter by quality
-  @@index([firmId, millOutvertId])                        // outvert sync lookup
-  @@index([firmId, millInvertId])                         // invert sync lookup
-  @@index([firmId, deletedAt])                            // soft-delete filter
+  // (firmId, takaSrNo) and (beamId, takaNo) uniqueness enforced via partial unique indexes
+  @@index([firmId])
+  @@index([firmId, entryDate])
+  @@index([firmId, machineId])
+  @@index([firmId, beamId])
+  @@index([firmId, productionQualityId])
+  @@index([firmId, millOutvertId])
+  @@index([firmId, millInvertId])
+  @@index([firmId, deletedAt])
+  @@index([beamId, takaNo])                              // beam-scoped takaNo lookup
   @@map("production_info")
 }
 
@@ -359,9 +388,9 @@ model Taka {
   productionInfo ProductionInfo @relation(fields: [productionInfoId], references: [id])
   beam           Beam           @relation(fields: [beamId], references: [id])
 
-  @@unique([firmId, takaSrNo])
-  @@index([firmId])                      // firm-scope filter
-  @@index([firmId, beamId])              // filter takas by beam
+  // (firmId, takaSrNo) uniqueness enforced via partial unique index
+  @@index([firmId])
+  @@index([firmId, beamId])
   @@index([firmId, deletedAt])
   @@map("takas")
 }
@@ -382,10 +411,10 @@ model MillOutvert {
   millInverts      MillInvert[]
   productionInfos  ProductionInfo[]
 
-  @@unique([firmId, firmChallanNo])
-  @@index([firmId])                      // firm-scope filter
-  @@index([firmId, millId])              // filter by mill
-  @@index([firmId, outvertDate])         // date range filter
+  // (firmId, firmChallanNo) uniqueness enforced via partial unique index
+  @@index([firmId])
+  @@index([firmId, millId])
+  @@index([firmId, outvertDate])
   @@index([firmId, deletedAt])
   @@map("mill_outverts")
 }
@@ -413,7 +442,8 @@ model MillInvert {
   millId          String
   millOutvertId   String
   invertDate      DateTime
-  millChallanNo   String    @unique                  // Mill's own reference — unique globally
+  // millChallanNo uniqueness enforced via partial unique index (global among non-deleted rows)
+  millChallanNo   String                             // Mill's own reference
   firmChallanNo   String                             // References the outvert's firmChallanNo
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -425,11 +455,11 @@ model MillInvert {
   invertTakas     MillInvertTaka[]
   productionInfos ProductionInfo[]
 
-  @@unique([firmId, firmChallanNo])
-  @@index([firmId])                      // firm-scope filter
-  @@index([firmId, millId])              // filter by mill
-  @@index([firmId, invertDate])          // date range filter
-  @@index([millOutvertId])               // match invert back to its outvert
+  // (firmId, firmChallanNo) uniqueness enforced via partial unique index
+  @@index([firmId])
+  @@index([firmId, millId])
+  @@index([firmId, invertDate])
+  @@index([millOutvertId])
   @@index([firmId, deletedAt])
   @@map("mill_inverts")
 }
@@ -454,7 +484,8 @@ model MillInvertTaka {
 model User {
   id           String    @id @default(uuid())
   name         String
-  email        String    @unique
+  // email uniqueness enforced via partial unique index (global among non-deleted rows)
+  email        String
   passwordHash String
   role         String    @default("admin")          // "super_admin" | "admin"
   status       String    @default("pending")         // "active" | "inactive" | "pending"
@@ -474,7 +505,7 @@ model User {
 model AdminPermission {
   id        String  @id @default(uuid())
   userId    String
-  module    String  // "beam_qualities" | "production_qualities" | "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills"
+  module    String  // "beam_qualities" | "production_qualities" | "machines" | "beams" | "production" | "takas" | "mill_outverts" | "mill_inverts" | "machine_info" | "mill_summary" | "firms" | "mills" | "dashboard"
   canView   Boolean @default(false)
   canCreate Boolean @default(false)
   canEdit   Boolean @default(false)
@@ -490,9 +521,9 @@ model AdminPermission {
 model PasswordResetToken {
   id        String    @id @default(uuid())
   userId    String
-  token     String    @unique
+  token     String    @unique                          // stored as a bcrypt HASH of the raw token (raw token only ever lives in the email link)
   expiresAt DateTime
-  usedAt    DateTime?                      // set when consumed — prevents reuse
+  usedAt    DateTime?                                  // set when consumed — prevents reuse
   createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id])
@@ -541,18 +572,42 @@ POST   /api/v1/auth/reset-password    # { token, password } → resets password 
 ### Auth (super_admin only — requires Bearer token + role: "super_admin")
 
 ```
-POST   /api/v1/auth/users             # Create user directly — always status:"active", skips pending flow
-GET    /api/v1/auth/pending-users     # List all users with status:"pending"
+GET    /api/v1/auth/users             # Paginated list of all users (?search= &status= &page= &limit=)
+POST   /api/v1/auth/users             # Create user directly — role:"admin", status:"active", skips pending flow
+GET    /api/v1/auth/pending-users     # Paginated list of users with status:"pending"
 POST   /api/v1/auth/approve-user/:id  # Set user status → "active", send approval email to user
 POST   /api/v1/auth/reject-user/:id   # Soft delete the pending user record
 ```
 
-### Permissions (super_admin only)
+### Permissions
 
 ```
 GET    /api/v1/permissions/:adminId   # Get all module permissions for an admin
-PUT    /api/v1/permissions/:adminId   # Set/replace all module permissions for an admin
+                                      # Allowed for: super_admin OR the admin themselves (self-read)
+PUT    /api/v1/permissions/:adminId   # Set/replace all module permissions for an admin (super_admin only)
                                       # Body: [{ module, canView, canCreate, canEdit, canDelete }, ...]
+```
+
+### Dashboard
+
+```
+GET    /api/v1/dashboard/stats             # ?firmId= — totalBeams, productionEntries, pendingTakas
+                                           # with week-over-week change percent + trend
+GET    /api/v1/dashboard/production-chart  # ?firmId= &type=daily|weekly|monthly
+                                           # Time-series sum of takaMeter bucketed by period
+```
+
+### Health
+
+```
+GET    /api/v1/health                 # Public — { success: true, message: "OK" }
+```
+
+### OpenAPI / Swagger
+
+```
+GET    /api/v1/api-docs               # Interactive Swagger UI
+GET    /api/v1/api-docs.json          # Raw OpenAPI spec (consumed by frontend codegen)
 ```
 
 ### Beam Qualities
@@ -575,24 +630,28 @@ PUT    /api/v1/production-qualities/:id    # Update production quality
 DELETE /api/v1/production-qualities/:id    # Soft delete (blocked if production records are linked)
 ```
 
-### Firms (super_admin only)
+### Firms (GET open to all auth'd users — writes are super_admin only)
 
 ```
-GET    /api/v1/firms            # List all firms
-POST   /api/v1/firms            # Create firm
-GET    /api/v1/firms/:id        # Get single firm
-PUT    /api/v1/firms/:id        # Update firm (including challanEnable toggle)
-DELETE /api/v1/firms/:id        # Soft delete (set deletedAt)
+GET    /api/v1/firms            # Any authenticated user
+POST   /api/v1/firms            # super_admin only (assertSuperAdmin)
+GET    /api/v1/firms/:id        # Any authenticated user
+PUT    /api/v1/firms/:id        # super_admin only (includes challanEnable toggle)
+DELETE /api/v1/firms/:id        # super_admin only — blocked if any active machine / beam / production exists
 ```
 
-### Mills (super_admin only)
+> Note: firms/mills routes do NOT use `requirePermission`. They use `authMiddleware` plus an
+> in-handler `assertSuperAdmin(req)` helper for writes. GET is open to any logged-in user so
+> admins can populate firm-pickers without needing an explicit `firms` permission.
+
+### Mills (GET open to all auth'd users — writes are super_admin only)
 
 ```
-GET    /api/v1/mills            # List all mills
-POST   /api/v1/mills            # Create mill
-GET    /api/v1/mills/:id        # Get single mill
-PUT    /api/v1/mills/:id        # Update mill
-DELETE /api/v1/mills/:id        # Soft delete
+GET    /api/v1/mills            # Any authenticated user
+POST   /api/v1/mills            # super_admin only
+GET    /api/v1/mills/:id        # Any authenticated user
+PUT    /api/v1/mills/:id        # super_admin only
+DELETE /api/v1/mills/:id        # super_admin only — soft delete
 ```
 
 ### Machines
@@ -608,10 +667,11 @@ DELETE /api/v1/machines/:id      # Soft delete
 ### Beams
 
 ```
-GET    /api/v1/beams             # ?search= &qualityId= &meter_min= &meter_max= &firmId=
-POST   /api/v1/beams             # Create beam
+GET    /api/v1/beams             # ?search= &qualityId= &meter_min= &meter_max= &firmId= &getAll=true
+                                 # getAll=true bypasses pagination and returns the full filtered list
+POST   /api/v1/beams             # Create beam — firmId is NOT supplied; it is auto-filled from the first ProductionInfo
 GET    /api/v1/beams/:id         # Get single beam
-PUT    /api/v1/beams/:id         # Update beam
+PUT    /api/v1/beams/:id         # Update beam — rejects beamMeter shrinkage below sum of existing takas
 DELETE /api/v1/beams/:id         # Soft delete (blocked if production records exist)
 ```
 
@@ -664,17 +724,26 @@ GET    /api/v1/mill-summary            # ?search= &mill= &status= &date_from= &d
 ## 8. Middleware Stack (in order, applied in app.ts)
 
 ```
-1. helmet()                   — HTTP security headers
-2. cors({ origin: FRONTEND_URL })
+0. app.set('trust proxy', 1) — required so express-rate-limit reads the real client IP behind Render's proxy
+1. helmet()                  — HTTP security headers
+2. cors({ origin: FRONTEND_URL, credentials: true })
 3. express.json()
-4. express.urlencoded()
-5. rateLimiter               — applied only to /api/v1/auth/login (10 req / 15 min / IP)
-6. authMiddleware            — verifies JWT, attaches req.user — applied to all routes except:
-                               /auth/login, /auth/refresh, /auth/logout,
-                               /auth/register, /auth/forgot-password, /auth/reset-password
-7. requirePermission(module, action) — applied per route handler (not globally); super_admin always passes; admin checked against AdminPermission table
-8. route handlers
-9. errorHandler              — global error handler at the bottom of app.ts
+4. express.urlencoded({ extended: true })
+5. cookie-parser             — needed to read the httpOnly refresh-token cookie
+6. authRateLimiter           — 10 req / 15 min / IP, applied to:
+                                 /api/v1/auth/login
+                                 /api/v1/auth/register
+                                 /api/v1/auth/forgot-password
+7. Swagger UI + spec mount   — /api/v1/api-docs (UI), /api/v1/api-docs.json (raw spec)
+8. authMiddleware            — verifies JWT, attaches req.user — applied per-route (not globally),
+                               omitted on: /auth/login, /auth/refresh, /auth/logout,
+                               /auth/register, /auth/forgot-password, /auth/reset-password, /health
+9. requirePermission(module, action) — applied per route handler (not globally); super_admin always
+                                       passes; admin checked against AdminPermission table. NOT used
+                                       by firms/mills routes (they use assertSuperAdmin inline instead)
+10. route handlers
+11. errorHandler             — global error handler at the bottom of app.ts (handles AppError,
+                               ZodError → 400, Prisma P2002 → 409, P2025 → 404, fallback → 500)
 ```
 
 ---
@@ -728,8 +797,12 @@ Do this inside a Prisma transaction.
 ### Rule 4 — Mill Invert: sync ProductionInfo after save
 
 After creating/updating a `MillInvert`, find all matched `ProductionInfo` records
-and update `millInvertId`, `millChallanNo`, and `millName`.
+and update `millInvertId`, `millInvertDate`, `millChallanNo`, and `millName`.
 Do this inside a Prisma transaction.
+
+`millChallanNo` is globally unique among non-deleted mill_inverts. `firmChallanNo` is unique
+per firm among non-deleted rows. Both are enforced via the service (pre-check) AND via partial
+unique indexes.
 
 ### Rule 5 — Soft delete everywhere
 
@@ -765,13 +838,56 @@ If any exist, reject with 400.
 
 ```typescript
 // In beam-qualities DELETE handler
-const count = await prisma.beam.count({ where: { beamQualityId: id, deletedAt: null } });
-if (count > 0) throw new AppError(400, 'Cannot delete — beams are linked', 'BEAM_QUALITY_IN_USE');
+const count = await prisma.beam.count({
+  where: { beamQualityId: id, deletedAt: null },
+});
+if (count > 0)
+  throw new AppError(
+    400,
+    "Cannot delete — beams are linked",
+    "BEAM_QUALITY_IN_USE",
+  );
 
 // In production-qualities DELETE handler
-const count = await prisma.productionInfo.count({ where: { productionQualityId: id, deletedAt: null } });
-if (count > 0) throw new AppError(400, 'Cannot delete — production records are linked', 'PRODUCTION_QUALITY_IN_USE');
+const count = await prisma.productionInfo.count({
+  where: { productionQualityId: id, deletedAt: null },
+});
+if (count > 0)
+  throw new AppError(
+    400,
+    "Cannot delete — production records are linked",
+    "PRODUCTION_QUALITY_IN_USE",
+  );
 ```
+
+### Rule 7a — Firm delete blocked if in use
+
+`DELETE /firms/:id` rejects with 400 if any non-deleted Machine, Beam, or ProductionInfo
+references it. (Mill records carry no `firmId`.)
+
+### Rule 7b — Beam.firmId auto-fill on first production
+
+A `Beam` is created with `firmId = null`. The first time a `ProductionInfo` is created against
+that beam, the production service:
+
+1. Rejects if `beam.firmId` is already set AND differs from the incoming `production.firmId`
+   (`BEAM_FIRM_MISMATCH`, 409).
+2. Inside the same transaction that creates the production + taka, sets `beam.firmId` to the
+   production's `firmId` if it was null.
+
+### Rule 7c — Total taka meter must never exceed beam meter
+
+On both `POST /production` and `PUT /production/:id`, the service sums `taka.takaMeter` for the
+target beam (excluding the row being updated) and rejects with 400 `TAKA_METER_EXCEEDS_BEAM`
+if adding/updating this entry would push the total over `beam.beamMeter`. The same constraint
+is also enforced on `PUT /beams/:id` when `beamMeter` would be reduced below the existing sum.
+
+### Rule 7d — Taka identifiers
+
+- `takaSrNo` is unique per firm (partial unique index + service pre-check).
+- `takaNo` is unique per beam (`(beamId, takaNo)` partial unique index + service pre-check).
+  It is nullable in the schema, but the create schema (`createProductionSchema`) requires it as a
+  non-empty string for new entries.
 
 ### Rule 8 — User registration flow
 
@@ -804,7 +920,9 @@ const productionInclude = {
   machine: { select: { id: true, machineNo: true, machineType: true } },
   beam: {
     select: {
-      id: true, beamNo: true, beamMeter: true,
+      id: true,
+      beamNo: true,
+      beamMeter: true,
       beamQuality: { select: { id: true, name: true } },
     },
   },
@@ -850,15 +968,19 @@ across all relevant text columns using Prisma's `OR` filter.
 // firmId is an optional query param filter — NOT taken from req.user
 const where = {
   deletedAt: null,
-  ...(firmId && { firmId }),             // optional: ?firmId= to filter by firm
+  ...(firmId && { firmId }), // optional: ?firmId= to filter by firm
   ...(search && {
     OR: [
       { beamNo: { contains: search, mode: "insensitive" as const } },
-      { beamQuality: { name: { contains: search, mode: "insensitive" as const } } },
+      {
+        beamQuality: {
+          name: { contains: search, mode: "insensitive" as const },
+        },
+      },
     ],
   }),
   // Additional filters from query params:
-  ...(qualityId && { beamQualityId: qualityId }),   // filter by quality FK
+  ...(qualityId && { beamQualityId: qualityId }), // filter by quality FK
   ...(meterMin && { beamMeter: { gte: new Prisma.Decimal(meterMin) } }),
   ...(meterMax && { beamMeter: { lte: new Prisma.Decimal(meterMax) } }),
 };
@@ -930,7 +1052,8 @@ Standard HTTP codes to use:
 Payload: `{ userId, role, email }`.
 
 **Refresh token:** JWT signed with `JWT_REFRESH_SECRET`, expires in `7d`.
-Stored in httpOnly cookie: `{ httpOnly: true, secure: true, sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 }`.
+Stored in httpOnly cookie: `{ httpOnly: true, secure: NODE_ENV === 'production', sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000 }`.
+`secure` is gated on `NODE_ENV` so local HTTP development still works; production must run over HTTPS.
 
 **Roles:**
 
@@ -940,9 +1063,17 @@ Stored in httpOnly cookie: `{ httpOnly: true, secure: true, sameSite: 'strict', 
 **Password hashing:** Always use `bcryptjs.hash(password, 12)`.
 Never return `passwordHash` in any API response — always explicitly exclude it in Prisma selects.
 
-**Password reset tokens:** Stored in `password_reset_tokens` table. Each token is a 32-byte random hex
-string, expires in 1 hour, marked `usedAt` when consumed. Always check `usedAt === null` AND
-`expiresAt > now` before accepting a token.
+**Password reset tokens:** Stored in `password_reset_tokens` table. The raw token is a
+32-byte random hex string (`crypto.randomBytes(32).toString('hex')`), but only its **bcrypt hash**
+is persisted in `token` — the raw string only lives in the email link. Tokens expire in 1 hour and
+are marked `usedAt` when consumed. To validate, fetch all non-expired/unused tokens and
+`bcrypt.compare(rawToken, candidate.token)` against each — the upfront delete of any prior
+tokens for the user keeps that candidate set tiny. Updating the password and marking the token
+used MUST happen in a single `prisma.$transaction`.
+
+**Login response includes permissions:** `POST /auth/login` returns
+`{ accessToken, permissions, user }`. The `permissions` array is the full `AdminPermission`
+rowset for the user so the frontend can render its sidebar without a second call.
 
 **Super admin emails:** Always read via `getSuperAdminEmails()` / `isSuperAdminEmail()` from
 `src/lib/superAdmin.ts`. Never hardcode emails in route or service files.
@@ -1039,8 +1170,15 @@ frontend never needs a second call.
 - Do NOT mutate `req.body` directly — destructure it first into typed variables
 - Do NOT hardcode super admin emails anywhere — always use `getSuperAdminEmails()` from `src/lib/superAdmin.ts`
 - Do NOT `await` email sends on the critical response path — fire-and-forget with `.catch((err) => console.error(...))`
-- Do NOT skip `requirePermission` on any protected route — every non-public route must declare its module and action
-- Do NOT perform permission checks inside route handlers — always use the `requirePermission` middleware
+- Do NOT skip `requirePermission` on any protected route — every non-public route must declare its
+  module and action. The ONLY documented exceptions are firms/mills (which use `assertSuperAdmin`
+  inline because GET is open to all authenticated users) and the auth super_admin endpoints
+  (which also use `assertSuperAdmin`). Don't invent new exceptions.
+- Do NOT perform permission checks inside route handlers when `requirePermission` would suffice
+- Do NOT rely on a Prisma unique-constraint error (P2002) to detect duplicates on fields like
+  `firmName`, `firmCode`, `beamNo`, `takaSrNo`, `takaNo`, `firmChallanNo`, `millChallanNo`, `email`,
+  etc. Those constraints are partial unique indexes scoped to `deletedAt IS NULL` — always pre-check
+  with `findFirst({ where: { ..., deletedAt: null } })` and throw a 409 `AppError` with a specific code
 - Do NOT return bare FK ids without the related object — every GET/POST/PUT response must embed the full related object (see Rule 9); use `include` on every `create`, `update`, and `findMany`/`findFirst`/`findUniqueOrThrow` call
 - Do NOT return the plain Prisma model from service functions — services must always `findUniqueOrThrow` at the end of each transaction with the module's `*Include` const so the enriched type is returned
 - Do NOT use `beamQuality: true` (full include with all fields) when embedding quality objects — always use `{ select: { id: true, name: true } }` to avoid leaking `deletedAt` and audit timestamps
@@ -1106,9 +1244,14 @@ app.get("/api/v1/api-docs.json", (req, res) => res.json(swaggerSpec));
  *       200:
  *         description: List of beams with pagination
  */
-router.get("/", authMiddleware, requirePermission('beams', 'view'), async (req, res) => {
-  // ... handler
-});
+router.get(
+  "/",
+  authMiddleware,
+  requirePermission("beams", "view"),
+  async (req, res) => {
+    // ... handler
+  },
+);
 ```
 
 ### Frontend command — run once after any backend route changes
@@ -1216,11 +1359,11 @@ npm run lint:fix    # auto-fix where possible
 
 ### Stack
 
-| Tool        | Role                                                              |
-| ----------- | ----------------------------------------------------------------- |
-| Jest v30    | Test runner                                                       |
-| ts-jest     | Compiles TypeScript tests — uses `tsconfig.test.json`             |
-| Supertest   | HTTP integration testing — mounts `app` directly, no live server  |
+| Tool      | Role                                                             |
+| --------- | ---------------------------------------------------------------- |
+| Jest v30  | Test runner                                                      |
+| ts-jest   | Compiles TypeScript tests — uses `tsconfig.test.json`            |
+| Supertest | HTTP integration testing — mounts `app` directly, no live server |
 
 ### Config files
 
@@ -1264,19 +1407,19 @@ npm test -- auth      # run a single file by name fragment
 
 ### Test coverage — one file per route module
 
-| Test file              | Route covered            |
-| ---------------------- | ------------------------ |
-| `auth.test.ts`         | `/api/v1/auth/*`         |
-| `firms.test.ts`        | `/api/v1/firms`          |
-| `mills.test.ts`        | `/api/v1/mills`          |
+| Test file                     | Route covered                  |
+| ----------------------------- | ------------------------------ |
+| `auth.test.ts`                | `/api/v1/auth/*`               |
+| `firms.test.ts`               | `/api/v1/firms`                |
+| `mills.test.ts`               | `/api/v1/mills`                |
 | `beamQualities.test.ts`       | `/api/v1/beam-qualities`       |
 | `productionQualities.test.ts` | `/api/v1/production-qualities` |
-| `machines.test.ts`     | `/api/v1/machines`       |
-| `beams.test.ts`        | `/api/v1/beams`          |
-| `production.test.ts`   | `/api/v1/production`     |
-| `takas.test.ts`        | `/api/v1/takas`          |
-| `millOutverts.test.ts` | `/api/v1/mill-outverts`  |
-| `millInverts.test.ts`  | `/api/v1/mill-inverts`   |
-| `machineInfo.test.ts`  | `/api/v1/machine-info`   |
-| `millSummary.test.ts`  | `/api/v1/mill-summary`   |
-| `permissions.test.ts`  | `/api/v1/permissions`    |
+| `machines.test.ts`            | `/api/v1/machines`             |
+| `beams.test.ts`               | `/api/v1/beams`                |
+| `production.test.ts`          | `/api/v1/production`           |
+| `takas.test.ts`               | `/api/v1/takas`                |
+| `millOutverts.test.ts`        | `/api/v1/mill-outverts`        |
+| `millInverts.test.ts`         | `/api/v1/mill-inverts`         |
+| `machineInfo.test.ts`         | `/api/v1/machine-info`         |
+| `millSummary.test.ts`         | `/api/v1/mill-summary`         |
+| `permissions.test.ts`         | `/api/v1/permissions`          |
