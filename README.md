@@ -15,8 +15,10 @@ A multi-firm production management platform for textile businesses. Each firm tr
 - **Mill Outvert / Invert** — fabric dispatched to mills and received back
 - **Machine Info** — live auto-generated machine status view
 - **Mill Summary** — consolidated view of each Taka's mill journey
+- **Beam Qualities / Production Qualities** — reusable quality master lists
+- **Dashboard** — aggregate stats + time-bucketed production charts
 
-Admin modules: Firm Management, Mill Management, Machine Management.
+Admin modules: Firm Management, Mill Management, Machine Management, Quality Masters, User & Permission Management.
 
 ---
 
@@ -89,7 +91,7 @@ SUPER_ADMIN_EMAILS="you@example.com"
 
 # SMTP for approval/reset emails (Gmail example)
 SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
+SMTP_PORT=465
 SMTP_USER="your@gmail.com"
 SMTP_PASS="your-app-password"
 ```
@@ -180,17 +182,20 @@ backend/
 │   │   └── permission.ts      # requirePermission(module, action) — super_admin bypasses; admin checks AdminPermission
 │   ├── routes/
 │   │   ├── auth.ts            # Login, refresh, logout, register, forgot/reset-password, user management
-│   │   ├── firms.ts           # CRUD — super_admin only
-│   │   ├── mills.ts           # CRUD — super_admin only
-│   │   ├── permissions.ts     # GET/PUT module permissions per admin — super_admin only
+│   │   ├── firms.ts           # CRUD — GET open to all auth'd users; writes super_admin only (assertSuperAdmin)
+│   │   ├── mills.ts           # CRUD — GET open to all auth'd users; writes super_admin only (assertSuperAdmin)
+│   │   ├── permissions.ts     # GET/PUT module permissions per admin (GET allowed for self)
+│   │   ├── beamQualities.ts   # CRUD — permission-gated
+│   │   ├── productionQualities.ts # CRUD — permission-gated
 │   │   ├── machines.ts        # CRUD — permission-gated
-│   │   ├── beams.ts           # CRUD — permission-gated
+│   │   ├── beams.ts           # CRUD — permission-gated (supports ?getAll=true)
 │   │   ├── production.ts      # CRUD — auto-creates Taka atomically
-│   │   ├── takas.ts           # GET only — auto-generated view
+│   │   ├── takas.ts           # GET only — supports ?status=not_sent|at_mill|returned
 │   │   ├── millOutverts.ts    # CRUD — syncs ProductionInfo fields
 │   │   ├── millInverts.ts     # CRUD — syncs ProductionInfo fields
 │   │   ├── machineInfo.ts     # GET only — auto-generated machine status view
-│   │   └── millSummary.ts     # GET only — consolidated Taka mill journey view
+│   │   ├── millSummary.ts     # GET only — consolidated Taka mill journey view
+│   │   └── dashboard.ts       # GET /dashboard/stats, /dashboard/production-chart
 │   ├── schemas/               # Zod validation schemas per module
 │   ├── services/              # Business logic (atomic transactions)
 │   │   ├── production.service.ts
@@ -216,10 +221,13 @@ backend/
 │       ├── mills.test.ts
 │       ├── permissions.test.ts
 │       ├── production.test.ts
+│       ├── beamQualities.test.ts
+│       ├── productionQualities.test.ts
 │       └── takas.test.ts
 ├── prisma/
 │   ├── schema.prisma          # Database schema
-│   └── migrations/            # Auto-generated SQL migration history
+│   ├── seed.ts                # Seed script — run via `npx prisma db seed`
+│   └── migrations/            # Auto-generated SQL migration history (includes partial unique indexes)
 ├── prisma.config.ts           # Prisma v7 datasource config (DATABASE_URL)
 ├── jest.config.ts             # Jest config — ts-jest preset, node environment
 ├── eslint.config.mjs          # ESLint flat config — TypeScript rules
@@ -255,42 +263,60 @@ Authorization: Bearer <accessToken>
 
 | Method | Endpoint                 | Description                                  |
 | ------ | ------------------------ | -------------------------------------------- |
+| GET    | `/auth/users`            | Paginated list of all users                  |
 | POST   | `/auth/users`            | Create user directly — always status: active |
 | GET    | `/auth/pending-users`    | List all pending registrations               |
 | POST   | `/auth/approve-user/:id` | Approve a pending user                       |
 | POST   | `/auth/reject-user/:id`  | Reject (soft-delete) a pending user          |
+| DELETE | `/auth/users/:id`        | Soft-delete admin (blocks self + super_admin targets) |
 
-### Permissions (super_admin only)
+### Permissions
 
-| Method | Endpoint                | Description                                 |
-| ------ | ----------------------- | ------------------------------------------- |
-| GET    | `/permissions/:adminId` | Get all module permissions for an admin     |
-| PUT    | `/permissions/:adminId` | Replace all module permissions for an admin |
+| Method | Endpoint                | Description                                                |
+| ------ | ----------------------- | ---------------------------------------------------------- |
+| GET    | `/permissions/:adminId` | Get all module permissions (super_admin OR the admin self) |
+| PUT    | `/permissions/:adminId` | Replace all module permissions (super_admin only)          |
 
-### Firm & Mill management (super_admin only)
+### Dashboard
 
-| Method         | Endpoint     | Description                     |
-| -------------- | ------------ | ------------------------------- |
-| GET/POST       | `/firms`     | List / create firms             |
-| GET/PUT/DELETE | `/firms/:id` | Get / update / soft-delete firm |
-| GET/POST       | `/mills`     | List / create mills             |
-| GET/PUT/DELETE | `/mills/:id` | Get / update / soft-delete mill |
+| Method | Endpoint                       | Description                                                |
+| ------ | ------------------------------ | ---------------------------------------------------------- |
+| GET    | `/dashboard/stats`             | totalBeams, productionEntries, pendingTakas + WoW change   |
+| GET    | `/dashboard/production-chart`  | Time-series by `?type=daily\|weekly\|monthly`              |
+
+### Firm & Mill management
+
+GET endpoints are open to any authenticated user (so admins can populate firm/mill pickers).
+POST / PUT / DELETE are restricted to `super_admin` via an in-handler `assertSuperAdmin()` check.
+
+| Method         | Endpoint     | Description                                                            |
+| -------------- | ------------ | ---------------------------------------------------------------------- |
+| GET            | `/firms`     | List firms (any auth'd user)                                           |
+| POST           | `/firms`     | Create firm (super_admin)                                              |
+| GET            | `/firms/:id` | Get firm (any auth'd user)                                             |
+| PUT/DELETE     | `/firms/:id` | Update / soft-delete firm (super_admin) — delete blocked if in use     |
+| GET            | `/mills`     | List mills (any auth'd user)                                           |
+| POST           | `/mills`     | Create mill (super_admin)                                              |
+| GET            | `/mills/:id` | Get mill (any auth'd user)                                             |
+| PUT/DELETE     | `/mills/:id` | Update / soft-delete mill (super_admin)                                |
 
 ### Data routes (permission-gated)
 
 All data routes accept an optional `?firmId=` query param to filter by firm.
 Access is gated by the `AdminPermission` table — super_admin bypasses all checks.
 
-| Module          | Endpoints                    | Notes                                 |
-| --------------- | ---------------------------- | ------------------------------------- |
-| Machines        | `/machines` — full CRUD      | `machine_no` unique per firm          |
-| Beams           | `/beams` — full CRUD         | `beam_no` unique per firm             |
-| Production Info | `/production` — full CRUD    | Auto-creates Taka atomically on save  |
-| Takas           | `/takas` — GET only          | Auto-generated, no direct create/edit |
-| Mill Outverts   | `/mill-outverts` — full CRUD | Syncs mill fields in Production Info  |
-| Mill Inverts    | `/mill-inverts` — full CRUD  | Syncs mill fields in Production Info  |
-| Machine Info    | `/machine-info` — GET only   | Auto-generated machine status view    |
-| Mill Summary    | `/mill-summary` — GET only   | Taka mill journey view                |
+| Module               | Endpoints                          | Notes                                                          |
+| -------------------- | ---------------------------------- | -------------------------------------------------------------- |
+| Beam Qualities       | `/beam-qualities` — full CRUD      | Delete blocked if linked to any beam                           |
+| Production Qualities | `/production-qualities` — full CRUD| Delete blocked if linked to any production record              |
+| Machines             | `/machines` — full CRUD            | `machine_no` unique per firm                                   |
+| Beams                | `/beams` — full CRUD               | `beam_no` globally unique; firmId auto-filled on first prod    |
+| Production Info      | `/production` — full CRUD          | Auto-creates Taka atomically; enforces total meter ≤ beamMeter |
+| Takas                | `/takas` — GET only                | Auto-generated; `?status=not_sent\|at_mill\|returned`          |
+| Mill Outverts        | `/mill-outverts` — full CRUD       | Syncs mill fields in Production Info                           |
+| Mill Inverts         | `/mill-inverts` — full CRUD        | Syncs mill fields in Production Info                           |
+| Machine Info         | `/machine-info` — GET only         | Auto-generated machine status view                             |
+| Mill Summary         | `/mill-summary` — GET only         | Taka mill journey view, grouped by firm challan                |
 
 ### Search and filters
 
@@ -307,10 +333,12 @@ Module-specific filters:
 
 | Module                | Extra filters                                                        |
 | --------------------- | -------------------------------------------------------------------- |
-| Beams                 | `?quality=` `?meter_min=` `?meter_max=`                              |
-| Production Info       | `?machine=` `?beam=` `?date_from=` `?date_to=` `?quality=`           |
+| Beams                 | `?qualityId=` `?meter_min=` `?meter_max=` `?getAll=true`             |
+| Production Info       | `?machine=` `?beam=` `?date_from=` `?date_to=` `?qualityId=`         |
+| Takas                 | `?beam_no=` `?meter_min=` `?meter_max=` `?status=`                   |
+| Machine Info          | `?machine_no=`                                                       |
 | Mill Outverts/Inverts | `?mill=` `?date_from=` `?date_to=`                                   |
-| Mill Summary          | `?mill=` `?status=sent\|returned\|pending` `?date_from=` `?date_to=` |
+| Mill Summary          | `?mill=` `?status=` `?date_from=` `?date_to=`                        |
 
 See full interactive docs at `http://localhost:4000/api/v1/api-docs` when running locally.
 
@@ -334,14 +362,16 @@ The `src/tests/setup.ts` file seeds all required `process.env` values — no `.e
 
 ## Database
 
-### Tables (13 total)
+### Tables (15 total)
 
 | Table                   | Purpose                                                       |
 | ----------------------- | ------------------------------------------------------------- |
 | `firms`                 | Registered textile firms                                      |
 | `mills`                 | External processing mills                                     |
 | `machines`              | Machines per firm (`machine_no` unique per firm)              |
-| `beams`                 | Raw material beams (`beam_no` unique per firm)                |
+| `beam_qualities`        | Reusable beam quality master                                  |
+| `beams`                 | Raw material beams (`beam_no` globally unique)                |
+| `production_qualities`  | Reusable production quality master                            |
 | `production_info`       | Central production records (`taka_sr_no` unique per firm)     |
 | `takas`                 | Auto-generated from production_info                           |
 | `mill_outverts`         | Fabric dispatch to mills (`firm_challan_no` unique per firm)  |
@@ -355,11 +385,16 @@ The `src/tests/setup.ts` file seeds all required `process.env` values — no `.e
 ### Key constraints
 
 - `machine_no` — unique per firm
-- `beam_no` — unique per firm
+- `beam_no` — globally unique (among non-deleted rows)
 - `taka_sr_no` — unique per firm
-- `firm_challan_no` — unique per firm
-- `mill_challan_no` — unique globally
+- `taka_no` — unique per beam (nullable, but required by the create schema)
+- `firm_challan_no` — unique per firm (both mill_outverts and mill_inverts)
+- `mill_challan_no` — globally unique (among non-deleted rows)
+- Soft-delete-aware uniqueness — most unique constraints are partial indexes
+  (`WHERE deleted_at IS NULL`), so a soft-deleted row never blocks recreation.
+  Services pre-check duplicates with `findFirst` — do NOT rely on Prisma's P2002.
 - All tables use soft delete (`deleted_at`) — no records are permanently removed
+  (exceptions: `admin_permissions` and `password_reset_tokens` are hard-deleted)
 
 ### Switching to production (Neon)
 

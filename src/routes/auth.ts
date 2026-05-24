@@ -700,4 +700,69 @@ router.post(
   },
 );
 
+/**
+ * @openapi
+ * /api/v1/auth/users/{id}:
+ *   delete:
+ *     summary: Delete an admin user (super_admin only)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User deleted successfully
+ *       400:
+ *         description: Cannot delete a super_admin or yourself
+ *       403:
+ *         description: Super admin only
+ *       404:
+ *         description: User not found
+ */
+router.delete(
+  "/users/:id",
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    assertSuperAdmin(req);
+
+    const id = req.params.id as string;
+
+    const user = await prisma.user.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!user) throw new AppError(404, "User not found", "USER_NOT_FOUND");
+
+    if (id === req.user?.userId)
+      throw new AppError(
+        400,
+        "Cannot delete your own account",
+        "CANNOT_DELETE_SELF",
+      );
+
+    if (user.role === "super_admin")
+      throw new AppError(
+        400,
+        "Cannot delete a super admin account",
+        "CANNOT_DELETE_SUPER_ADMIN",
+      );
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+      // PasswordResetToken and AdminPermission have no deletedAt — hard-delete them
+      await tx.passwordResetToken.deleteMany({ where: { userId: id } });
+      await tx.adminPermission.deleteMany({ where: { userId: id } });
+    });
+
+    res.json({ success: true, message: "User deleted successfully" });
+  },
+);
+
 export default router;

@@ -122,6 +122,7 @@ router.get(
           millInvertDate: true,
           millOutvertId: true,
           millInvertId: true,
+          millInvert: { select: { invertDate: true } },
           machine: { select: { machineNo: true } },
           beam: { select: { beamNo: true } },
           productionQuality: { select: { name: true } },
@@ -129,9 +130,14 @@ router.get(
       }),
     ]);
 
+    const mappedData = data.map(({ millInvert: linkedInvert, millInvertDate, ...rest }) => ({
+      ...rest,
+      millInvertDate: millInvertDate ?? linkedInvert?.invertDate ?? null,
+    }));
+
     res.json({
       success: true,
-      data,
+      data: mappedData,
       pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
     });
   },
@@ -177,10 +183,12 @@ router.get(
         remark: true,
         productionChallanNo: true,
         millOutvertDate: true,
+        millInvertDate: true,
         millChallanNo: true,
         millName: true,
         millOutvertId: true,
         millInvertId: true,
+        millInvert: { select: { invertDate: true } },
         firm: { select: { firmName: true } },
         machine: { select: { machineNo: true } },
         beam: { select: { beamNo: true } },
@@ -191,7 +199,14 @@ router.get(
       throw new AppError(404, "Production record not found", "PRODUCTION_NOT_FOUND");
     }
 
-    res.json({ success: true, data: record });
+    const { millInvert: linkedInvert, millInvertDate, ...recordRest } = record;
+    res.json({
+      success: true,
+      data: {
+        ...recordRest,
+        millInvertDate: millInvertDate ?? linkedInvert?.invertDate ?? null,
+      },
+    });
   },
 );
 

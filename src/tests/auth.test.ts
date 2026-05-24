@@ -18,6 +18,10 @@ jest.mock("../lib/prisma", () => ({
       create: jest.fn(),
       update: jest.fn(),
     },
+    adminPermission: {
+      findMany: jest.fn(),
+      deleteMany: jest.fn(),
+    },
     $transaction: jest.fn(),
   },
 }));
@@ -68,6 +72,8 @@ const mockBcrypt = bcryptjs as unknown as Record<string, jest.Mock>;
 
 const SUPER_ADMIN_ID = "aaaaaaaa-0000-0000-0000-000000000001";
 const ADMIN_ID = "bbbbbbbb-0000-0000-0000-000000000002";
+const ANOTHER_ADMIN_ID = "cccccccc-0000-0000-0000-000000000003";
+const ANOTHER_SUPER_ID = "dddddddd-0000-0000-0000-000000000004";
 const SUPER_TOKEN = "Bearer mock-super-token";
 
 const superAdminUser = {
@@ -98,11 +104,14 @@ const pendingUser = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Reset to safe defaults — prevents mock state from leaking across tests
   mockVerify.mockReturnValue({
     userId: SUPER_ADMIN_ID,
     role: "super_admin",
     email: "superadmin@textile.test",
   });
+  mockIsSuperAdmin.mockReturnValue(false);
+  mockBcrypt.compare.mockResolvedValue(true);
   db.$transaction.mockImplementation(
     async (cb: (tx: typeof db) => Promise<unknown>) => cb(db),
   );
@@ -722,5 +731,124 @@ describe("POST /api/v1/auth/reject-user/:id", () => {
       .set("Authorization", "Bearer mock-admin-token");
 
     expect(res.status).toBe(403);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DELETE /api/v1/auth/users/:id  (super_admin only)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const activeAdminUser = {
+  id: ANOTHER_ADMIN_ID,
+  name: "Active Admin",
+  email: "activeadmin@textile.test",
+  passwordHash: "$2a$12$hashed",
+  role: "admin",
+  status: "active",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
+  lastLoginAt: null,
+};
+
+const anotherSuperAdmin = {
+  id: ANOTHER_SUPER_ID,
+  name: "Another Super Admin",
+  email: "another@textile.test",
+  passwordHash: "$2a$12$hashed",
+  role: "super_admin",
+  status: "active",
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
+  lastLoginAt: null,
+};
+
+describe("DELETE /api/v1/auth/users/:id", () => {
+  it("200 — super_admin soft-deletes an admin user and cleans up tokens/permissions", async () => {
+    db.user.findFirst.mockResolvedValue(activeAdminUser);
+    db.user.update.mockResolvedValue({
+      ...activeAdminUser,
+      deletedAt: new Date(),
+    });
+    db.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 });
+    db.adminPermission.deleteMany.mockResolvedValue({ count: 0 });
+
+    const res = await request(app)
+      .delete(`/api/v1/auth/users/${ANOTHER_ADMIN_ID}`)
+      .set("Authorization", SUPER_TOKEN);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toMatch(/deleted successfully/i);
+    expect(db.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ deletedAt: expect.any(Date) }),
+      }),
+    );
+    expect(db.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+      where: { userId: ANOTHER_ADMIN_ID },
+    });
+    expect(db.adminPermission.deleteMany).toHaveBeenCalledWith({
+      where: { userId: ANOTHER_ADMIN_ID },
+    });
+  });
+
+  it("400 — cannot delete own account returns CANNOT_DELETE_SELF", async () => {
+    // Logged-in user is SUPER_ADMIN_ID; mock returns the same user record
+    db.user.findFirst.mockResolvedValue(superAdminUser);
+
+    const res = await request(app)
+      .delete(`/api/v1/auth/users/${SUPER_ADMIN_ID}`)
+      .set("Authorization", SUPER_TOKEN);
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("CANNOT_DELETE_SELF");
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  it("400 — cannot delete another super_admin returns CANNOT_DELETE_SUPER_ADMIN", async () => {
+    db.user.findFirst.mockResolvedValue(anotherSuperAdmin);
+
+    const res = await request(app)
+      .delete(`/api/v1/auth/users/${ANOTHER_SUPER_ID}`)
+      .set("Authorization", SUPER_TOKEN);
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe("CANNOT_DELETE_SUPER_ADMIN");
+    expect(db.user.update).not.toHaveBeenCalled();
+  });
+
+  it("404 — user not found returns USER_NOT_FOUND", async () => {
+    db.user.findFirst.mockResolvedValue(null);
+
+    const res = await request(app)
+      .delete("/api/v1/auth/users/non-existent-id")
+      .set("Authorization", SUPER_TOKEN);
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe("USER_NOT_FOUND");
+  });
+
+  it("401 — no auth header returns 401", async () => {
+    const res = await request(app).delete(
+      `/api/v1/auth/users/${ANOTHER_ADMIN_ID}`,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("403 — admin role returns FORBIDDEN", async () => {
+    mockVerify.mockReturnValue({
+      userId: ADMIN_ID,
+      role: "admin",
+      email: "admin@test.com",
+    });
+
+    const res = await request(app)
+      .delete(`/api/v1/auth/users/${ANOTHER_ADMIN_ID}`)
+      .set("Authorization", "Bearer mock-admin-token");
+
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe("FORBIDDEN");
   });
 });
