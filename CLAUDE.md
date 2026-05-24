@@ -58,6 +58,7 @@ backend/
 │   │   │                      # GET /users, POST /users (super_admin),
 │   │   │                      # GET /pending-users (super_admin),
 │   │   │                      # POST /approve-user/:id, /reject-user/:id (super_admin)
+│   │   │                      # DELETE /users/:id (super_admin — soft delete admin; blocked for super_admin targets and self)
 │   │   ├── firms.ts           # CRUD for firms — GET open to all auth'd users; POST/PUT/DELETE super_admin-only via assertSuperAdmin()
 │   │   ├── mills.ts           # CRUD for mills — same pattern as firms (assertSuperAdmin in handler, no requirePermission)
 │   │   ├── beamQualities.ts   # CRUD for beam_qualities — /api/v1/beam-qualities
@@ -165,7 +166,7 @@ SUPER_ADMIN_EMAILS="admin1@example.com,admin2@example.com"
 
 # SMTP — used for approval request emails, password reset emails, and account approved emails
 SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
+SMTP_PORT=465
 SMTP_USER="your@gmail.com"
 SMTP_PASS="your-app-password"
 
@@ -577,6 +578,7 @@ POST   /api/v1/auth/users             # Create user directly — role:"admin", s
 GET    /api/v1/auth/pending-users     # Paginated list of users with status:"pending"
 POST   /api/v1/auth/approve-user/:id  # Set user status → "active", send approval email to user
 POST   /api/v1/auth/reject-user/:id   # Soft delete the pending user record
+DELETE /api/v1/auth/users/:id         # Soft delete an admin user (blocked for super_admin targets and self)
 ```
 
 ### Permissions
@@ -679,8 +681,12 @@ DELETE /api/v1/beams/:id         # Soft delete (blocked if production records ex
 
 ```
 GET    /api/v1/production        # ?search= &machine= &beam= &date_from= &date_to= &qualityId= &firmId=
+                                 # Response resolves millInvertDate: uses stored value; falls back to
+                                 # millInvert.invertDate when the stored value is null (handles records
+                                 # created before auto-fill was in place)
 POST   /api/v1/production        # Create + auto-create Taka (atomic transaction)
 GET    /api/v1/production/:id    # Get single entry with all linked data
+                                 # Same millInvertDate fallback resolution as list route
 PUT    /api/v1/production/:id    # Update + sync Taka (atomic)
 DELETE /api/v1/production/:id    # Soft delete + soft delete linked Taka
 ```
@@ -689,10 +695,15 @@ DELETE /api/v1/production/:id    # Soft delete + soft delete linked Taka
 
 ```
 GET    /api/v1/takas             # ?search= &beam_no= &meter_min= &meter_max= &firmId= &status=
+                                 # meter_min and meter_max can be used independently or together —
+                                 # both merge into a single takaMeter range condition
                                  # status: not_sent (no millOutvertId) | at_mill (outvert set, no invert)
                                  #         | returned (millInvertId set)
                                  # Invalid status value → 400 INVALID_STATUS
+                                 # productionInfo.millInvertDate in response uses same fallback as
+                                 # production routes: stored value ?? millInvert.invertDate ?? null
 GET    /api/v1/takas/:id         # Get single Taka with linked ProductionInfo
+                                 # productionInfo.millInvertDate uses same fallback resolution
 ```
 
 ### Mill Outverts
@@ -721,6 +732,8 @@ DELETE /api/v1/mill-inverts/:id        # Soft delete + clear invert fields in Pr
 
 ```
 GET    /api/v1/machine-info            # ?search= &machine_no= &firmId=
+                                       # search: case-insensitive contains across machineNo AND machineType
+                                       # machine_no: dedicated filter on machineNo only (independent of search)
 GET    /api/v1/mill-summary            # ?search= &mill= &status= &date_from= &date_to= &firmId=
 ```
 
@@ -869,6 +882,31 @@ if (count > 0)
 
 `DELETE /firms/:id` rejects with 400 if any non-deleted Machine, Beam, or ProductionInfo
 references it. (Mill records carry no `firmId`.)
+
+### Rule 7e — User delete: guards + cascade cleanup
+
+`DELETE /api/v1/auth/users/:id` (super_admin only) enforces two guards **before** soft-deleting:
+
+1. **Self-deletion blocked** — if `id === req.user.userId`, throw 400 `CANNOT_DELETE_SELF`.
+   Checked first so the error is specific even when the caller tries to delete their own super_admin account.
+2. **Super admin target blocked** — if the target user's `role === "super_admin"`, throw 400
+   `CANNOT_DELETE_SUPER_ADMIN`.
+
+On success, all three writes run inside a single `prisma.$transaction`:
+
+```typescript
+await prisma.$transaction(async (tx) => {
+  // 1. Soft-delete the user record
+  await tx.user.update({ where: { id }, data: { deletedAt: new Date() } });
+  // 2. Hard-delete password reset tokens — no deletedAt column on this model
+  await tx.passwordResetToken.deleteMany({ where: { userId: id } });
+  // 3. Hard-delete admin permissions — no deletedAt column on this model
+  await tx.adminPermission.deleteMany({ where: { userId: id } });
+});
+```
+
+`PasswordResetToken` and `AdminPermission` have no `deletedAt` field and must be hard-deleted.
+Deleting the tokens prevents a deleted user from consuming a still-valid password reset link.
 
 ### Rule 7b — Beam.firmId auto-fill on first production
 
@@ -1387,9 +1425,12 @@ All tests use **unit-style mocking** — no real database or network calls.
 
 ```typescript
 // Mock prisma at the top of every test file (hoisted by Jest)
+// Include every model whose methods the route-under-test calls.
 jest.mock("../lib/prisma", () => ({
   prisma: {
-    user: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn(), ... },
+    user: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), count: jest.fn() },
+    passwordResetToken: { findMany: jest.fn(), deleteMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+    adminPermission: { findMany: jest.fn(), deleteMany: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -1400,6 +1441,21 @@ jest.mock("../lib/mailer", () => ({
   sendAccountApprovedEmail: jest.fn(),
   sendPasswordResetEmail: jest.fn(),
 }));
+```
+
+**`beforeEach` reset pattern** — `jest.clearAllMocks()` clears call history but does **not** reset
+`mockReturnValue` / `mockResolvedValue` implementations. Always re-declare any mock return value that
+a test overrides, and reset commonly-shared mocks (like `isSuperAdminEmail`, `bcryptjs.compare`) back
+to safe defaults in `beforeEach` to prevent state from leaking across tests:
+
+```typescript
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockVerify.mockReturnValue({ userId: SUPER_ADMIN_ID, role: "super_admin", email: "..." });
+  mockIsSuperAdmin.mockReturnValue(false);   // prevent leak from tests that set it to true
+  mockBcrypt.compare.mockResolvedValue(true); // prevent leak from "wrong password" tests
+  db.$transaction.mockImplementation(async (cb) => cb(db));
+});
 ```
 
 ### Running tests

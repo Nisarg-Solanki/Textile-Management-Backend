@@ -17,6 +17,10 @@ const router = Router();
  *       - in: query
  *         name: search
  *         schema: { type: string }
+ *         description: Case-insensitive contains search across machineNo and machineType
+ *       - in: query
+ *         name: machine_no
+ *         schema: { type: string }
  *         description: Filter by machine number (case-insensitive contains)
  *       - in: query
  *         name: firmId
@@ -40,6 +44,7 @@ router.get(
   requirePermission("machine_info", "view"),
   async (req: Request, res: Response) => {
     const search = req.query.search as string | undefined;
+    const machineNo = req.query.machine_no as string | undefined;
     const firmId = req.query.firmId as string | undefined;
     const page = Math.max(1, parseInt((req.query.page as string) ?? "1", 10));
     const limit = Math.min(
@@ -52,7 +57,13 @@ router.get(
       deletedAt: null,
       ...(firmId && { firmId }),
       ...(search && {
-        machineNo: { contains: search, mode: "insensitive" as const },
+        OR: [
+          { machineNo: { contains: search, mode: "insensitive" as const } },
+          { machineType: { contains: search, mode: "insensitive" as const } },
+        ],
+      }),
+      ...(machineNo && {
+        machineNo: { contains: machineNo, mode: "insensitive" as const },
       }),
     };
 

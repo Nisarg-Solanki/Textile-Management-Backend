@@ -52,7 +52,13 @@
           "endpoint": "/firms",
           "method": "GET",
           "apiFile": "src/lib/api/firms.ts",
-          "fieldsUsed": ["id", "firmName", "firmCode", "challanEnable", "status"]
+          "fieldsUsed": [
+            "id",
+            "firmName",
+            "firmCode",
+            "challanEnable",
+            "status"
+          ]
         }
       ]
     },
@@ -264,6 +270,7 @@
             "remark",
             "firm.firmName",
             "millOutvertDate",
+            "millInvertDate",
             "millChallanNo",
             "millName",
             "millOutvertId",
@@ -289,6 +296,7 @@
             "firm.firmName",
             "createdAt",
             "productionInfo.millOutvertDate",
+            "productionInfo.millInvertDate",
             "productionInfo.millInvertId"
           ]
         },
@@ -656,7 +664,13 @@
           "endpoint": "/machines",
           "method": "POST",
           "apiFile": "src/lib/actions/machines.actions.ts",
-          "fieldsUsed": ["firmId", "machineNo", "machineType", "remark", "status"]
+          "fieldsUsed": [
+            "firmId",
+            "machineNo",
+            "machineType",
+            "remark",
+            "status"
+          ]
         }
       ]
     },
@@ -668,7 +682,13 @@
           "endpoint": "/machines/{id}",
           "method": "GET",
           "apiFile": "src/lib/api/machines.ts",
-          "fieldsUsed": ["firmId", "machineNo", "machineType", "remark", "status"]
+          "fieldsUsed": [
+            "firmId",
+            "machineNo",
+            "machineType",
+            "remark",
+            "status"
+          ]
         },
         {
           "endpoint": "/firms",
@@ -681,7 +701,13 @@
           "endpoint": "/machines/{id}",
           "method": "PUT",
           "apiFile": "src/lib/actions/machines.actions.ts",
-          "fieldsUsed": ["firmId", "machineNo", "machineType", "remark", "status"]
+          "fieldsUsed": [
+            "firmId",
+            "machineNo",
+            "machineType",
+            "remark",
+            "status"
+          ]
         }
       ]
     },
@@ -700,7 +726,13 @@
           "endpoint": "/beams",
           "method": "POST",
           "apiFile": "src/lib/actions/beams.actions.ts",
-          "fieldsUsed": ["beamNo", "tar", "beamQualityId", "takaQty", "beamMeter"]
+          "fieldsUsed": [
+            "beamNo",
+            "tar",
+            "beamQualityId",
+            "takaQty",
+            "beamMeter"
+          ]
         },
         {
           "endpoint": "/beam-qualities",
@@ -719,7 +751,13 @@
           "endpoint": "/beams/{id}",
           "method": "GET",
           "apiFile": "src/lib/api/beams.ts",
-          "fieldsUsed": ["beamNo", "tar", "beamQualityId", "takaQty", "beamMeter"]
+          "fieldsUsed": [
+            "beamNo",
+            "tar",
+            "beamQualityId",
+            "takaQty",
+            "beamMeter"
+          ]
         },
         {
           "endpoint": "/beam-qualities",
@@ -732,7 +770,13 @@
           "endpoint": "/beams/{id}",
           "method": "PUT",
           "apiFile": "src/lib/actions/beams.actions.ts",
-          "fieldsUsed": ["beamNo", "tar", "beamQualityId", "takaQty", "beamMeter"]
+          "fieldsUsed": [
+            "beamNo",
+            "tar",
+            "beamQualityId",
+            "takaQty",
+            "beamMeter"
+          ]
         },
         {
           "endpoint": "/beam-qualities",
@@ -911,7 +955,13 @@
           "endpoint": "/mill-outverts",
           "method": "POST",
           "apiFile": "src/lib/actions/millOutverts.actions.ts",
-          "fieldsUsed": ["firmId", "millId", "outvertDate", "firmChallanNo", "takaSrNos"]
+          "fieldsUsed": [
+            "firmId",
+            "millId",
+            "outvertDate",
+            "firmChallanNo",
+            "takaSrNos"
+          ]
         }
       ]
     },
@@ -923,7 +973,13 @@
           "endpoint": "/mill-outverts/{id}",
           "method": "GET",
           "apiFile": "src/lib/api/millOutverts.ts",
-          "fieldsUsed": ["firmId", "millId", "outvertDate", "firmChallanNo", "outvertTakas"]
+          "fieldsUsed": [
+            "firmId",
+            "millId",
+            "outvertDate",
+            "firmChallanNo",
+            "outvertTakas"
+          ]
         },
         {
           "endpoint": "/firms",
@@ -950,7 +1006,13 @@
           "endpoint": "/mill-outverts/{id}",
           "method": "PUT",
           "apiFile": "src/lib/actions/millOutverts.actions.ts",
-          "fieldsUsed": ["firmId", "millId", "outvertDate", "firmChallanNo", "takaSrNos"]
+          "fieldsUsed": [
+            "firmId",
+            "millId",
+            "outvertDate",
+            "firmChallanNo",
+            "takaSrNos"
+          ]
         }
       ]
     },

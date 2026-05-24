@@ -89,8 +89,12 @@ router.get(
       ...(beamNo && {
         beam: { beamNo: { contains: beamNo, mode: "insensitive" as const } },
       }),
-      ...(meterMin && { takaMeter: { gte: new Prisma.Decimal(meterMin) } }),
-      ...(meterMax && { takaMeter: { lte: new Prisma.Decimal(meterMax) } }),
+      ...((meterMin ?? meterMax) && {
+        takaMeter: {
+          ...(meterMin && { gte: new Prisma.Decimal(meterMin) }),
+          ...(meterMax && { lte: new Prisma.Decimal(meterMax) }),
+        },
+      }),
       ...(search && {
         OR: [
           { takaSrNo: { contains: search, mode: "insensitive" as const } },
@@ -117,7 +121,9 @@ router.get(
             select: {
               takaNo: true,
               millOutvertDate: true,
+              millInvertDate: true,
               millInvertId: true,
+              millInvert: { select: { invertDate: true } },
             },
           },
         },
@@ -126,13 +132,17 @@ router.get(
 
     const data = rawList.map((r) => {
       const { productionInfo, ...rest } = r;
+      const { millInvert: linkedInvert, millInvertDate, ...piRest } = productionInfo ?? {
+        millInvert: null,
+        millInvertDate: null,
+      };
       return {
         ...rest,
         takaNo: productionInfo?.takaNo ?? null,
         productionInfo: productionInfo
           ? {
-              millOutvertDate: productionInfo.millOutvertDate,
-              millInvertId: productionInfo.millInvertId,
+              ...piRest,
+              millInvertDate: millInvertDate ?? linkedInvert?.invertDate ?? null,
             }
           : null,
       };
@@ -188,6 +198,7 @@ router.get(
             millOutvertDate: true,
             millInvertDate: true,
             millInvertId: true,
+            millInvert: { select: { invertDate: true } },
             machine: { select: { machineNo: true } },
             productionQuality: { select: { name: true } },
           },
@@ -197,11 +208,23 @@ router.get(
 
     if (!taka) throw new AppError(404, "Taka not found", "TAKA_NOT_FOUND");
 
+    const pi = taka.productionInfo;
+    const { millInvert: linkedInvert, millInvertDate, ...piRest } = pi ?? {
+      millInvert: null,
+      millInvertDate: null,
+    };
+
     res.json({
       success: true,
       data: {
         ...taka,
-        takaNo: taka.productionInfo?.takaNo ?? null,
+        takaNo: pi?.takaNo ?? null,
+        productionInfo: pi
+          ? {
+              ...piRest,
+              millInvertDate: millInvertDate ?? linkedInvert?.invertDate ?? null,
+            }
+          : null,
       },
     });
   },
