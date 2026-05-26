@@ -11,6 +11,9 @@ const transportOptions: SMTPTransport.Options = {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    family: 4
+  } as any
 };
 
 const transporter = nodemailer.createTransport(transportOptions);
