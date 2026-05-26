@@ -13,6 +13,7 @@ const transportOptions: SMTPTransport.Options = {
   },
   tls: {
     family: 4
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 };
 
