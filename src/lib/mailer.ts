@@ -10,6 +10,8 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const FROM_EMAIL = process.env.SMTP_FROM;
+
 export function sendApprovalRequestEmail(
   newUserName: string,
   newUserEmail: string,
@@ -21,6 +23,7 @@ export function sendApprovalRequestEmail(
 
   transporter
     .sendMail({
+      from: FROM_EMAIL,
       to: recipients.join(", "),
       subject: `New registration pending approval — ${newUserEmail}`,
       text: `A new user has registered and is awaiting approval.\n\nName: ${newUserName}\nEmail: ${newUserEmail}\n\nReview pending users: ${link}`,
@@ -33,6 +36,7 @@ export function sendAccountApprovedEmail(toEmail: string, name: string): void {
 
   transporter
     .sendMail({
+      from: FROM_EMAIL,
       to: toEmail,
       subject: "Your account has been approved",
       text: `Hi ${name},\n\nYour account has been approved. You can now log in.\n\n${link}`,
@@ -48,6 +52,7 @@ export function sendPasswordResetEmail(
 
   transporter
     .sendMail({
+      from: FROM_EMAIL,
       to: toEmail,
       subject: "Reset your password",
       text: `You requested a password reset. Use the link below — it expires in 1 hour.\n\n${link}\n\nIf you did not request this, ignore this email.`,
