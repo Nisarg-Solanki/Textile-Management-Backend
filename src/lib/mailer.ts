@@ -1,20 +1,19 @@
 import nodemailer from "nodemailer";
 import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import { getSuperAdminEmails } from "./superAdmin";
+import { setDefaultResultOrder } from "node:dns";
+
+setDefaultResultOrder("ipv4first");
 
 const transportOptions: SMTPTransport.Options = {
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT),
-  secure: false,     // false = STARTTLS (port 587); avoids IPv6-only SSL on port 465
-  requireTLS: true,  // still enforces TLS upgrade after connection
+  secure: false,
+  requireTLS: true,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
-  },
-  tls: {
-    family: 4
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } as any
+  }
 };
 
 const transporter = nodemailer.createTransport(transportOptions);
