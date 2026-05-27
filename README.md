@@ -89,11 +89,11 @@ FRONTEND_URL="http://localhost:3000"
 # Comma-separated emails that are auto-approved as super_admin on registration
 SUPER_ADMIN_EMAILS="you@example.com"
 
-# SMTP for approval/reset emails (Gmail example)
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=465
-SMTP_USER="your@gmail.com"
-SMTP_PASS="your-app-password"
+# Gmail API OAuth2 — used for approval, reset, and account-approved emails
+CLIENT_ID="your-google-oauth2-client-id"
+CLIENT_SECRET="your-google-oauth2-client-secret"
+REFRESH_TOKEN="your-google-oauth2-refresh-token"
+FROM_EMAIL="your@gmail.com"
 ```
 
 ### 4. Run database migrations
@@ -205,7 +205,7 @@ backend/
 │   │   ├── prisma.ts          # Prisma client singleton
 │   │   ├── jwt.ts             # signToken / verifyToken helpers
 │   │   ├── errors.ts          # AppError class + global error handler
-│   │   ├── mailer.ts          # nodemailer — approval, reset, and approved emails
+│   │   ├── mailer.ts          # Gmail API (googleapis OAuth2) — approval, reset, and approved emails
 │   │   └── superAdmin.ts      # getSuperAdminEmails() / isSuperAdminEmail()
 │   └── tests/
 │       ├── setup.ts           # Seeds process.env for all test files
@@ -446,10 +446,10 @@ Re-run any time you add or change a backend route.
 | `NODE_ENV`               | Environment — affects error detail and cookie security             | `development` or `production`                          |
 | `FRONTEND_URL`           | Allowed CORS origin + used in email links                          | `http://localhost:3000`                                |
 | `SUPER_ADMIN_EMAILS`     | Comma-separated emails auto-approved as super_admin                | `admin@example.com`                                    |
-| `SMTP_HOST`              | SMTP server host                                                   | `smtp.gmail.com`                                       |
-| `SMTP_PORT`              | SMTP server port                                                   | `587`                                                  |
-| `SMTP_USER`              | SMTP login email                                                   | `your@gmail.com`                                       |
-| `SMTP_PASS`              | SMTP password or app password                                      | `xxxx xxxx xxxx xxxx`                                  |
+| `CLIENT_ID`              | Google OAuth2 client ID (for Gmail API)                             | from Google Cloud Console                              |
+| `CLIENT_SECRET`          | Google OAuth2 client secret                                        | from Google Cloud Console                              |
+| `REFRESH_TOKEN`          | Google OAuth2 refresh token (generated via OAuth playground)        | from OAuth2 Playground                                 |
+| `FROM_EMAIL`             | Sender email address (must match the OAuth2-authorized Gmail)       | `your@gmail.com`                                       |
 
 ---
 
