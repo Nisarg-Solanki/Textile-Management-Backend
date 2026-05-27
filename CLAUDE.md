@@ -100,7 +100,7 @@ backend/
 │   │   ├── prisma.ts          # Prisma client singleton — uses PrismaPg adapter; cached on globalThis in dev
 │   │   ├── jwt.ts             # signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken
 │   │   ├── errors.ts          # AppError class + global errorHandler (handles AppError, ZodError, Prisma P2002/P2025)
-│   │   ├── mailer.ts          # nodemailer — sendApprovalRequestEmail, sendPasswordResetEmail, sendAccountApprovedEmail
+│   │   ├── mailer.ts          # Gmail API (googleapis OAuth2) — sendApprovalRequestEmail, sendPasswordResetEmail, sendAccountApprovedEmail
 │   │   └── superAdmin.ts      # getSuperAdminEmails(), isSuperAdminEmail() — reads SUPER_ADMIN_EMAILS env var
 │   └── tests/
 │       ├── setup.ts           # Jest global setup — seeds process.env for all test files
@@ -164,11 +164,11 @@ FRONTEND_URL="http://localhost:3000"
 # is auto-approved regardless of email (first-time setup).
 SUPER_ADMIN_EMAILS="admin1@example.com,admin2@example.com"
 
-# SMTP — used for approval request emails, password reset emails, and account approved emails
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=465
-SMTP_USER="your@gmail.com"
-SMTP_PASS="your-app-password"
+# Gmail API OAuth2 — used for approval request emails, password reset emails, and account approved emails
+CLIENT_ID="your-google-oauth2-client-id"
+CLIENT_SECRET="your-google-oauth2-client-secret"
+REFRESH_TOKEN="your-google-oauth2-refresh-token"
+FROM_EMAIL="your@gmail.com"
 
 # Base URL of the frontend — used to build links inside emails
 FRONTEND_URL="http://localhost:3000"
@@ -1121,9 +1121,12 @@ rowset for the user so the frontend can render its sidebar without a second call
 **Super admin emails:** Always read via `getSuperAdminEmails()` / `isSuperAdminEmail()` from
 `src/lib/superAdmin.ts`. Never hardcode emails in route or service files.
 
-**Email sending:** All calls to `mailer.ts` must be fire-and-forget — never `await` them on the
-critical response path. Always chain `.catch((err) => console.error(...))` so a mail failure never
-breaks the API response.
+**Email sending:** Emails are sent via the Gmail API (`googleapis` package) using OAuth2
+(`CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`). `nodemailer` is no longer used for transport;
+the `mailer.ts` module constructs raw RFC 2822 messages and sends them through
+`google.gmail({ version: 'v1' }).users.messages.send()`. All calls must remain fire-and-forget —
+never `await` them on the critical response path. Always chain
+`.catch((err) => console.error(...))` so a mail failure never breaks the API response.
 
 ---
 
@@ -1168,7 +1171,8 @@ frontend never needs a second call.
     "zod": "^3.25.x", // Latest v3 stable
     "jsonwebtoken": "^9.0.x", // Latest stable, unchanged
     "bcryptjs": "^3.0.x", // v3 released 2025 — was ^2.x in old file
-    "nodemailer": "^6.9.x", // Email sending — approval requests, password resets
+    "googleapis": "^172.0.x", // Gmail API — OAuth2 email sending (replaces nodemailer SMTP)
+    "nodemailer": "^8.0.x", // Still a dependency but no longer used for SMTP transport
     "dotenv": "^16.5.x", // Latest stable
     "helmet": "^8.0.x", // v8 released 2024 — was ^7.x in old file
     "cors": "^2.8.x", // Latest stable, unchanged
@@ -1189,7 +1193,7 @@ frontend never needs a second call.
     "@types/bcryptjs": "^2.4.x",
     "@types/cors": "^2.8.x",
     "@types/cookie-parser": "^1.4.x",
-    "@types/nodemailer": "^6.4.x", // Types for nodemailer
+    "@types/nodemailer": "^6.4.x", // Types for nodemailer (retained for compatibility)
     "@types/pg": "^8.x",
     "@types/swagger-jsdoc": "^6.0.x",
     "@types/swagger-ui-express": "^4.1.x",
