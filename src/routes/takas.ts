@@ -124,6 +124,7 @@ router.get(
               millInvertDate: true,
               millInvertId: true,
               millInvert: { select: { invertDate: true } },
+              millOutvert: { select: { firmChallanNo: true } },
             },
           },
         },
@@ -132,9 +133,10 @@ router.get(
 
     const data = rawList.map((r) => {
       const { productionInfo, ...rest } = r;
-      const { millInvert: linkedInvert, millInvertDate, ...piRest } = productionInfo ?? {
+      const { millInvert: linkedInvert, millInvertDate, millOutvert, ...piRest } = productionInfo ?? {
         millInvert: null,
         millInvertDate: null,
+        millOutvert: null,
       };
       return {
         ...rest,
@@ -143,6 +145,7 @@ router.get(
           ? {
               ...piRest,
               millInvertDate: millInvertDate ?? linkedInvert?.invertDate ?? null,
+              firmChallanNo: millOutvert?.firmChallanNo ?? null,
             }
           : null,
       };
@@ -199,6 +202,7 @@ router.get(
             millInvertDate: true,
             millInvertId: true,
             millInvert: { select: { invertDate: true } },
+            millOutvert: { select: { firmChallanNo: true } },
             machine: { select: { machineNo: true } },
             productionQuality: { select: { name: true } },
           },
@@ -209,9 +213,10 @@ router.get(
     if (!taka) throw new AppError(404, "Taka not found", "TAKA_NOT_FOUND");
 
     const pi = taka.productionInfo;
-    const { millInvert: linkedInvert, millInvertDate, ...piRest } = pi ?? {
+    const { millInvert: linkedInvert, millInvertDate, millOutvert, ...piRest } = pi ?? {
       millInvert: null,
       millInvertDate: null,
+      millOutvert: null,
     };
 
     res.json({
@@ -223,6 +228,7 @@ router.get(
           ? {
               ...piRest,
               millInvertDate: millInvertDate ?? linkedInvert?.invertDate ?? null,
+              firmChallanNo: millOutvert?.firmChallanNo ?? null,
             }
           : null,
       },

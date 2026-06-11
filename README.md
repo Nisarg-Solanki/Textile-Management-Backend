@@ -312,8 +312,8 @@ Access is gated by the `AdminPermission` table — super_admin bypasses all chec
 | Machines             | `/machines` — full CRUD            | `machine_no` unique per firm                                   |
 | Beams                | `/beams` — full CRUD               | `beam_no` globally unique; firmId auto-filled on first prod    |
 | Production Info      | `/production` — full CRUD          | Auto-creates Taka atomically; enforces total meter ≤ beamMeter |
-| Takas                | `/takas` — GET only                | Auto-generated; `?status=not_sent\|at_mill\|returned`          |
-| Mill Outverts        | `/mill-outverts` — full CRUD       | Syncs mill fields in Production Info                           |
+| Takas                | `/takas` — GET only                | Auto-generated; includes outvert firmChallanNo                 |
+| Mill Outverts        | `/mill-outverts` — full CRUD       | Syncs mill fields; includes linked millInverts                 |
 | Mill Inverts         | `/mill-inverts` — full CRUD        | Syncs mill fields in Production Info                           |
 | Machine Info         | `/machine-info` — GET only         | Auto-generated machine status view                             |
 | Mill Summary         | `/mill-summary` — GET only         | Taka mill journey view, grouped by firm challan                |

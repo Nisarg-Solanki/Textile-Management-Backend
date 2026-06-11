@@ -297,7 +297,8 @@
             "createdAt",
             "productionInfo.millOutvertDate",
             "productionInfo.millInvertDate",
-            "productionInfo.millInvertId"
+            "productionInfo.millInvertId",
+            "productionInfo.firmChallanNo"
           ]
         },
         {
@@ -331,7 +332,8 @@
             "productionInfo.millName",
             "productionInfo.millOutvertDate",
             "productionInfo.millInvertDate",
-            "productionInfo.millInvertId"
+            "productionInfo.millInvertId",
+            "productionInfo.firmChallanNo"
           ]
         }
       ]
@@ -350,7 +352,9 @@
             "firmChallanNo",
             "mill.millName",
             "firm.firmName",
-            "outvertTakas[].length"
+            "outvertTakas[].length",
+            "millInverts[].invertDate",
+            "millInverts[].millChallanNo"
           ]
         }
       ]
@@ -371,7 +375,9 @@
             "firm.firmName",
             "outvertTakas[].id",
             "outvertTakas[].takaSrNo",
-            "outvertTakas[].takaMeter"
+            "outvertTakas[].takaMeter",
+            "millInverts[].invertDate",
+            "millInverts[].millChallanNo"
           ]
         }
       ]
