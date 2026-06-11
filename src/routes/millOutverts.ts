@@ -100,6 +100,8 @@ router.get(
           firm: { select: { firmName: true } },
           mill: { select: { millName: true } },
           outvertTakas: { select: { id: true, takaSrNo: true } },
+          millInverts: { select: { invertDate: true, millChallanNo: true } },
+          productionInfos: { select: { id: true, takaSrNo: true, millInvertDate: true, millChallanNo: true } },
         },
       }),
     ]);
@@ -147,6 +149,8 @@ router.get(
         firm: { select: { firmName: true } },
         mill: { select: { millName: true } },
         outvertTakas: { select: { id: true, takaSrNo: true } },
+        millInverts: { select: { invertDate: true, millChallanNo: true } },
+        productionInfos: { select: { id: true, takaSrNo: true, millInvertDate: true, millChallanNo: true } },
       },
     });
     if (!outvert) {

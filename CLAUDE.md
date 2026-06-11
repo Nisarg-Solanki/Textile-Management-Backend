@@ -702,17 +702,21 @@ GET    /api/v1/takas             # ?search= &beam_no= &meter_min= &meter_max= &f
                                  # Invalid status value → 400 INVALID_STATUS
                                  # productionInfo.millInvertDate in response uses same fallback as
                                  # production routes: stored value ?? millInvert.invertDate ?? null
+                                 # Also includes firmChallanNo mapped from millOutvert.firmChallanNo
 GET    /api/v1/takas/:id         # Get single Taka with linked ProductionInfo
                                  # productionInfo.millInvertDate uses same fallback resolution
+                                 # Also includes firmChallanNo mapped from millOutvert.firmChallanNo
 ```
 
 ### Mill Outverts
 
 ```
 GET    /api/v1/mill-outverts           # ?search= &mill= &date_from= &date_to= &firmId=
+                                       # Response includes linked millInverts (invertDate, millChallanNo)
 POST   /api/v1/mill-outverts           # Create + sync ProductionInfo (atomic)
 GET    /api/v1/mill-outverts/:id       # Get single outvert with Taka list
                                        # outvertTakas items include takaMeter (resolved from Taka table)
+                                       # Response includes linked millInverts (invertDate, millChallanNo)
 PUT    /api/v1/mill-outverts/:id       # Update + re-sync ProductionInfo
 DELETE /api/v1/mill-outverts/:id       # Soft delete + clear mill fields in ProductionInfo
 ```
